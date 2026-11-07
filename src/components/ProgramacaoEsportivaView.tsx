@@ -29,7 +29,10 @@ import {
   subscribeFirestoreAlunos,
   subscribeFirestorePermissoesEsporte,
   saveFirestorePermissaoEsporte,
-  batchSaveFirestorePermissoesEsporte
+  batchSaveFirestorePermissoesEsporte,
+  clearAllFirestoreInscricoesEsporte,
+  saveFirestoreConfiguracaoEsporte,
+  subscribeFirestoreConfiguracaoEsporte
 } from '../lib/firestoreService';
 
 interface ProgramacaoEsportivaViewProps {
@@ -98,10 +101,15 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
       setPermissoesMap(map);
     });
 
+    const unsubConfig = subscribeFirestoreConfiguracaoEsporte((trancado) => {
+      setInscricoesTrancadas(trancado);
+    });
+
     return () => {
       unsubProg();
       unsubAlunos();
       unsubPerms();
+      unsubConfig();
     };
   }, []);
 
@@ -278,16 +286,16 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     await batchSaveFirestorePermissoesEsporte(atualizados);
   };
 
+  const handleToggleTrancarInscricoes = async () => {
+    const novoStatus = !inscricoesTrancadas;
+    setInscricoesTrancadas(novoStatus);
+    await saveFirestoreConfiguracaoEsporte(novoStatus);
+  };
+
   const handleResetarInscricoes = async () => {
-    if (window.confirm('Deseja realmente resetar todas as permissões e inscrições de aulas dos alunos?')) {
-      const resetados = alunos.map(aluno => ({
-        alunoNome: aluno.nome,
-        turma: aluno.turma || '',
-        liberado: true,
-        aulasPermitidas: [],
-        liberadoJustificativa: false
-      }));
-      await batchSaveFirestorePermissoesEsporte(resetados);
+    if (window.confirm('Deseja realmente RESETAR E APAGAR TODAS AS INSCRIÇÕES já realizadas pelos alunos?\n\nIsso limpará instantaneamente a Lista de Inscrição no banco de dados e na tela inicial.')) {
+      await clearAllFirestoreInscricoesEsporte();
+      alert('✅ Todas as pré-inscrições foram apagadas e a Lista de Inscrição foi zerada com sucesso!');
     }
   };
 
@@ -612,7 +620,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                   {/* Top Action Buttons (Trancar / Resetar) */}
                   <div className="flex flex-wrap items-center gap-3">
                     <button
-                      onClick={() => setInscricoesTrancadas(!inscricoesTrancadas)}
+                      onClick={handleToggleTrancarInscricoes}
                       className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 border cursor-pointer ${
                         inscricoesTrancadas
                           ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500 hover:text-black'

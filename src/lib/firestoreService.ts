@@ -10,7 +10,7 @@ import {
   getDoc
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
-import { Turma, Aluno, User, ProgramacaoItem, PermissaoAlunoEsporte } from '../types';
+import { Turma, Aluno, User, ProgramacaoItem, PermissaoAlunoEsporte, InscricaoEsporte } from '../types';
 
 export enum OperationType {
   CREATE = 'create',
@@ -464,4 +464,91 @@ export async function batchSaveFirestorePermissoesEsporte(permissoes: PermissaoA
     await saveFirestorePermissaoEsporte(p);
   }
 }
+
+// ==========================================
+// INSCRIÇÕES DE ESPORTE
+// ==========================================
+export async function saveFirestoreInscricaoEsporte(inscricao: InscricaoEsporte): Promise<void> {
+  const path = 'inscricoes_esporte';
+  try {
+    const docId = (inscricao.alunoNome.trim().toUpperCase() + '_' + (inscricao.data || new Date().toISOString().split('T')[0])).replace(/[^A-Z0-9]/g, '_');
+    await setDoc(doc(db, path, docId), {
+      alunoNome: inscricao.alunoNome.trim().toUpperCase(),
+      turma: inscricao.turma || '',
+      data: inscricao.data || new Date().toISOString().split('T')[0],
+      celulaConfirmada: inscricao.celulaConfirmada !== false,
+      celulaHora: inscricao.celulaHora || '',
+      turmasSelecionadas: inscricao.turmasSelecionadas || [],
+      criadoEm: inscricao.criadoEm || new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export function subscribeFirestoreInscricoesEsporte(onUpdate: (list: InscricaoEsporte[]) => void) {
+  const path = 'inscricoes_esporte';
+  return onSnapshot(collection(db, path), (snap) => {
+    const list: InscricaoEsporte[] = [];
+    snap.forEach(d => {
+      const data = d.data();
+      list.push({
+        id: d.id,
+        alunoNome: data.alunoNome || '',
+        turma: data.turma || '',
+        data: data.data || '',
+        celulaConfirmada: !!data.celulaConfirmada,
+        celulaHora: data.celulaHora || '',
+        turmasSelecionadas: Array.isArray(data.turmasSelecionadas) ? data.turmasSelecionadas : [],
+        criadoEm: data.criadoEm || ''
+      });
+    });
+    onUpdate(list);
+  }, (error) => {
+    handleFirestoreError(error, OperationType.LIST, path);
+  });
+}
+
+export async function clearAllFirestoreInscricoesEsporte(): Promise<void> {
+  const path = 'inscricoes_esporte';
+  try {
+    const snap = await getDocs(collection(db, path));
+    for (const d of snap.docs) {
+      await deleteDoc(doc(db, path, d.id));
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
+// ==========================================
+// CONFIGURAÇÃO GLOBAL ESPORTE (TRANCAR / LIBERAR INSCRIÇÕES)
+// ==========================================
+export async function saveFirestoreConfiguracaoEsporte(trancado: boolean): Promise<void> {
+  const path = 'configuracoes_esporte';
+  try {
+    await setDoc(doc(db, path, 'status_geral'), {
+      trancado: !!trancado,
+      updatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, path);
+  }
+}
+
+export function subscribeFirestoreConfiguracaoEsporte(onUpdate: (trancado: boolean) => void) {
+  const path = 'configuracoes_esporte';
+  return onSnapshot(doc(db, path, 'status_geral'), (snap) => {
+    if (snap.exists()) {
+      onUpdate(!!snap.data().trancado);
+    } else {
+      onUpdate(false);
+    }
+  }, (error) => {
+    handleFirestoreError(error, OperationType.GET, path);
+  });
+}
+
+
+
 

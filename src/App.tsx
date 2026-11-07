@@ -8,7 +8,7 @@ import { ArenaView } from './components/ArenaView';
 import { ArenaFacialView } from './components/ArenaFacialView';
 import { RelatorioView } from './components/RelatorioView';
 import { ProgramacaoEsportivaView } from './components/ProgramacaoEsportivaView';
-import { Trophy, ArrowLeft } from 'lucide-react';
+import { EsporteView } from './components/EsporteView';
 
 export default function App() {
   const [activeView, setActiveView] = useState<
@@ -93,28 +93,9 @@ export default function App() {
         <RelatorioView onBack={() => setActiveView('admin-dashboard')} />
       )}
 
-      {/* 10. Área de Esporte Info Modal / Preview */}
+      {/* 10. Área de Esporte (Pré Inscrição & Justificativas) */}
       {activeView === 'esporte-info' && (
-        <div className="min-h-screen w-full circuit-bg flex flex-col justify-center items-center p-6 text-center">
-          <div className="bg-[#051c2c]/90 border-2 border-cyan-400 p-8 rounded-2xl max-w-lg w-full shadow-[0_0_30px_rgba(0,229,255,0.3)]">
-            <div className="w-16 h-16 rounded-full bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300 mx-auto mb-4">
-              <Trophy className="w-8 h-8" />
-            </div>
-            <h2 className="text-3xl font-bold uppercase text-white font-rajdhani tracking-wider mb-2">
-              ÁREA DE ESPORTE
-            </h2>
-            <p className="text-gray-300 text-sm mb-6">
-              Módulo de atividades esportivas e acompanhamento de treinos do Projeto Tsunami.
-            </p>
-            <button
-              onClick={() => setActiveView('home')}
-              className="px-6 py-2.5 bg-cyan-500 text-black font-bold uppercase rounded-lg hover:bg-cyan-400 transition cursor-pointer flex items-center justify-center gap-2 mx-auto"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Voltar ao Início</span>
-            </button>
-          </div>
-        </div>
+        <EsporteView onBackToHome={() => setActiveView('home')} />
       )}
     </div>
   );

@@ -41,5 +41,15 @@ service cloud.firestore {
     match /permissoes_esporte/{permissaoId} {
       allow read, write: if true;
     }
+
+    // Inscricoes Esporte collection
+    match /inscricoes_esporte/{inscricaoId} {
+      allow read, write: if true;
+    }
+
+    // Configuracoes Esporte collection
+    match /configuracoes_esporte/{configId} {
+      allow read, write: if true;
+    }
   }
 }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Briefcase, Trophy, ChevronRight } from 'lucide-react';
+import { ListaInscricoesWidget } from './ListaInscricoesWidget';
 
 interface HomeViewProps {
   onOpenAdmin: () => void;
@@ -122,6 +123,9 @@ export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
           </div>
 
         </div>
+
+        {/* LISTA DE INSCRIÇÃO Section right below the two main buttons */}
+        <ListaInscricoesWidget />
 
       </main>
 

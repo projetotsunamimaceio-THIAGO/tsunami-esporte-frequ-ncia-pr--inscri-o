@@ -576,14 +576,19 @@ export function ArenaView({ onBack }: ArenaViewProps) {
 
                           const kEdit = aIdx + '-' + dIdx;
                           const s = editando[kEdit] !== undefined ? editando[kEdit] : (freq[chave(aluno.nome, dia)] || '');
+                          const txtJust = editando[kEdit + '-txt'] || freq[chave(aluno.nome, dia) + '-txt'] || '';
 
                           return (
                             <td key={dIdx} className="p-2 text-center border-r border-emerald-500/10">
                               <button
                                 onClick={() => cicloStatus(aIdx, dIdx)}
-                                className={`w-9 h-9 rounded-lg font-bold text-sm transition cursor-pointer border flex items-center justify-center mx-auto ${CORES[s]}`}
+                                title={s === 'J' ? `Justificativa: ${txtJust || 'Não informada'}` : undefined}
+                                className={`w-9 h-9 rounded-lg font-bold text-sm transition cursor-pointer border flex items-center justify-center mx-auto relative ${CORES[s]}`}
                               >
                                 {s}
+                                {s === 'J' && txtJust && (
+                                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-cyan-400 rounded-full shadow-[0_0_6px_#22d3ee]"></span>
+                                )}
                               </button>
                             </td>
                           );

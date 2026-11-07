@@ -35,6 +35,7 @@ export interface ProgramacaoItem {
   isFixa?: boolean;
   hora: string;
   dias: string[]; // e.g. ['seg', 'ter', 'qua', 'qui', 'sex']
+  vagas?: number;
 }
 
 export interface PermissaoAlunoEsporte {
@@ -43,6 +44,17 @@ export interface PermissaoAlunoEsporte {
   liberado: boolean;
   aulasPermitidas: string[];
   liberadoJustificativa: boolean;
+}
+
+export interface InscricaoEsporte {
+  id: string;
+  alunoNome: string;
+  turma: string;
+  data: string;
+  celulaConfirmada: boolean;
+  celulaHora: string;
+  turmasSelecionadas: string[];
+  criadoEm: string;
 }
 
 export const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby-23cMovuAZ0m6JouTueAara4JIYnAQVvRImBzhZWMh26gWhm0aB_KiFpRo2t2CcEQCA/exec";
