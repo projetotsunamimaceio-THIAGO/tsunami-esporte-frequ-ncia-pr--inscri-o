@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSUNAMI - Alunos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%); color: white; font-family: 'Segoe UI', sans-serif; min-height: 100vh; }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 0, 255, 0.1); }
+        .btn-fuchsia { border: 1px solid #ff00ff; background: rgba(255, 0, 255, 0.1); transition: all 0.3s; color: #ff00ff; }
+        .btn-fuchsia:hover { background: #ff00ff; color: black; box-shadow: 0 0 20px rgba(255, 0, 255, 0.4); }
+        
+        select, input, textarea { 
+            background: #1a1a2e !important; 
+            border: 1px solid rgba(255, 0, 255, 0.2) !important; 
+            color: white !important; 
+        }
+        select option { background-color: #1a1a2e !important; color: white !important; }
+
+        textarea { resize: vertical; min-height: 120px; }
+        .aluno-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.1); border-left: 4px solid #ff00ff; transition: all 0.3s; }
+        .aluno-card:hover { background: rgba(255, 0, 255, 0.05); transform: translateX(5px); }
+        .edit-btn { color: #fbbf24; transition: 0.3s; }
+        .edit-btn:hover { color: #f59e0b; text-shadow: 0 0 10px rgba(251, 191, 36, 0.5); }
+        .delete-btn { color: #f43f5e; transition: 0.3s; }
+        .delete-btn:hover { color: #e11d48; text-shadow: 0 0 10px rgba(244, 63, 94, 0.5); }
+        .search-box { background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 0, 255, 0.2); }
+        .lote-badge { background: rgba(244, 63, 94, 0.2); color: #f43f5e; font-size: 10px; padding: 2px 8px; border-radius: 12px; margin-left: 8px; }
+        .nivel-badge { background: rgba(59, 130, 246, 0.2); color: #60a5fa; font-size: 10px; padding: 2px 8px; border-radius: 12px; margin-left: 8px; }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(5px); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .tab-btn { background: transparent; border: 1px solid rgba(255, 0, 255, 0.3); color: #ff00ff; padding: 8px 20px; border-radius: 8px 8px 0 0; cursor: pointer; transition: all 0.3s; font-size: 12px; text-transform: uppercase; font-weight: bold; }
+        .tab-btn.active { background: rgba(255, 0, 255, 0.2); border-bottom: 2px solid #ff00ff; }
+        .empty-state { color: rgba(255, 0, 255, 0.4); font-style: italic; }
+
+        #cameraContainer { display: none; flex-direction: column; align-items: center; gap: 10px; margin-top: 15px; border-top: 1px solid rgba(255, 0, 255, 0.2); padding-top: 15px; }
+        #video { width: 100%; max-width: 400px; border-radius: 10px; border: 2px solid #ff00ff; transform: scaleX(-1); }
+        #canvas { display: none; }
+        .capture-indicator { width: 10px; height: 10px; background: #ff00ff; border-radius: 50%; box-shadow: 0 0 10px #ff00ff; animation: pulse 1s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .preview-capture { max-width: 200px; border-radius: 8px; border: 2px solid #10b981; margin-top: 10px; }
+    </style>
+</head>
+<body class="p-4 md:p-8" onload="inicializar()">
+    <script>if (sessionStorage.getItem('tsunami_logged') !== 'true') { window.location.href = 'login.html'; }</script>
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <a href="index.html" class="btn-fuchsia px-4 py-2 rounded-lg text-xs uppercase font-bold"><i class="fas fa-arrow-left mr-2"></i>Voltar</a>
+            <h1 class="text-2xl md:text-3xl font-bold text-fuchsia-400 tracking-widest uppercase text-center flex-1"><i class="fas fa-user-plus mr-3"></i>Gerenciar Alunos</h1>
+            <div class="w-20"></div>
+        </div>
+
+        <div class="flex gap-2 mb-0">
+            <button onclick="switchTab('individual')" id="tabIndividual" class="tab-btn active"><i class="fas fa-user mr-2"></i>Individual</button>
+            <button onclick="switchTab('lote')" id="tabLote" class="tab-btn"><i class="fas fa-layer-group mr-2"></i>Cadastro em Lote</button>
+        </div>
+
+        <div id="formIndividual" class="glass p-6 rounded-b-2xl rounded-tr-2xl mb-8">
+            <h2 class="text-sm uppercase tracking-[0.3em] text-fuchsia-300 mb-6 border-b border-fuchsia-500/20 pb-2">Novo Aluno</h2>
+            <form id="formAluno" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Nome Completo</label>
+                    <input type="text" id="nome" placeholder="Ex: João Silva" class="w-full p-3 rounded-lg outline-none uppercase" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Turma</label>
+                    <select id="turma" class="w-full p-3 rounded-lg outline-none" required><option value="">Selecione...</option></select>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Matrícula</label>
+                    <input type="date" id="matricula" class="w-full p-3 rounded-lg outline-none" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Vencimento</label>
+                    <input type="date" id="vencimento" class="w-full p-3 rounded-lg outline-none" required>
+                </div>
+                
+                <!-- NOVO CAMPO: NÍVEL DO ALUNO -->
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Nível</label>
+                    <select id="nivel_aluno" class="w-full p-3 rounded-lg outline-none" required>
+                        <option value="">Selecione...</option>
+                        <option value="1">⭐ Iniciante</option>
+                        <option value="2">⭐⭐ Básico</option>
+                        <option value="3">⭐⭐⭐ Intermediário</option>
+                        <option value="4">⭐⭐⭐⭐ Avançado</option>
+                        <option value="5">⭐⭐⭐⭐⭐ Elite</option>
+                    </select>
+                </div>
+
+                <div class="md:col-span-1 flex gap-2">
+                    <div class="flex-1 text-center">
+                        <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Câmera</label>
+                        <button type="button" onclick="toggleCamera()" id="btnCamera" class="w-full border border-blue-500 bg-blue-500/10 text-blue-400 p-3 rounded-lg h-[46px] flex items-center justify-center hover:bg-blue-500 hover:text-white transition">
+                            <i class="fas fa-camera"></i>
+                        </button>
+                    </div>
+                    <div class="flex-1 text-center">
+                        <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Arquivo</label>
+                        <input type="file" id="inputFile" accept="image/*" class="hidden" onchange="handleFileUpload(this)">
+                        <button type="button" onclick="document.getElementById('inputFile').click()" class="w-full border border-emerald-500 bg-emerald-500/10 text-emerald-400 p-3 rounded-lg h-[46px] flex items-center justify-center hover:bg-emerald-500 hover:text-white transition">
+                            <i class="fas fa-upload"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="md:col-span-1">
+                    <button type="submit" id="saveBtn" class="w-full btn-fuchsia p-3 rounded-lg uppercase font-bold text-xs h-[46px] flex items-center justify-center"><i class="fas fa-plus"></i></button>
+                </div>
+
+                <div id="cameraContainer" class="md:col-span-12">
+                    <div class="flex items-center gap-2 mb-2">
+                        <div class="capture-indicator"></div>
+                        <span class="text-[10px] uppercase text-fuchsia-300">Posicione o rosto no centro e bem iluminado</span>
+                    </div>
+                    <video id="video" autoplay muted></video>
+                    <canvas id="canvas"></canvas>
+                    <div id="previewContainer" class="hidden flex-col items-center mt-3">
+                        <p class="text-[10px] text-emerald-400 mb-2"><i class="fas fa-check-circle mr-1"></i> Foto capturada! Preview:</p>
+                        <img id="previewImg" class="preview-capture">
+                    </div>
+                    <p id="fotoStatus" class="text-[10px] text-emerald-400 hidden mt-2"><i class="fas fa-check-circle mr-1"></i> Foto pronta para cadastro!</p>
+                </div>
+            </form>
+        </div>
+
+        <div id="formLote" class="glass p-6 rounded-b-2xl rounded-tr-2xl mb-8 hidden">
+            <h2 class="text-sm uppercase tracking-[0.3em] text-fuchsia-300 mb-6 border-b border-fuchsia-500/20 pb-2 flex justify-between items-center">
+                <span>Cadastro em Lote</span>
+                <span class="text-xs text-gray-400 font-normal normal-case">Um nome por linha</span>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-4 mb-4">
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Turma</label>
+                    <select id="turmaLote" class="w-full p-3 rounded-lg outline-none" required><option value="">Selecione...</option></select>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Matrícula</label>
+                    <input type="date" id="matriculaLote" class="w-full p-3 rounded-lg outline-none" required>
+                </div>
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Vencimento</label>
+                    <input type="date" id="vencimentoLote" class="w-full p-3 rounded-lg outline-none" required>
+                </div>
+                <!-- NOVO CAMPO: NÍVEL PARA LOTE -->
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Nível (padrão)</label>
+                    <select id="nivelLote" class="w-full p-3 rounded-lg outline-none">
+                        <option value="1">⭐ Iniciante</option>
+                        <option value="2">⭐⭐ Básico</option>
+                        <option value="3">⭐⭐⭐ Intermediário</option>
+                        <option value="4">⭐⭐⭐⭐ Avançado</option>
+                        <option value="5">⭐⭐⭐⭐⭐ Elite</option>
+                    </select>
+                </div>
+            </div>
+            <div class="mb-4">
+                <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Lista de Nomes (um por linha)</label>
+                <textarea id="listaNomesLote" placeholder="Carlos Silva&#10;Maria Oliveira&#10;João Santos..." class="w-full p-4 rounded-lg outline-none font-mono text-sm"></textarea>
+            </div>
+            <button onclick="cadastrarLote()" id="btnCadastrarLote" class="w-full btn-fuchsia p-4 rounded-lg uppercase font-bold tracking-wider flex items-center justify-center gap-2"><i class="fas fa-users"></i> Cadastrar Todos</button>
+        </div>
+
+        <div class="glass p-6 rounded-2xl">
+            <div class="flex flex-col md:flex-row justify-between items-center mb-6 gap-4 border-b border-fuchsia-500/20 pb-4">
+                <h2 class="text-sm uppercase tracking-[0.3em] text-fuchsia-300 flex items-center gap-2">
+                    <i class="fas fa-users"></i> Alunos Cadastrados
+                    <span id="totalAlunos" class="text-xs bg-fuchsia-500/20 px-3 py-1 rounded-full">0 alunos</span>
+                </h2>
+                <button onclick="sincronizarAlunos()" class="text-xs bg-fuchsia-500/20 px-3 py-1 rounded-full hover:bg-fuchsia-500/30 transition"><i class="fas fa-sync mr-1"></i>Sincronizar</button>
+                <div class="relative w-full md:w-72">
+                    <i class="fas fa-search absolute left-3 top-1/2 transform -translate-y-1/2 text-fuchsia-400"></i>
+                    <input type="text" id="busca" placeholder="Buscar aluno..." class="search-box w-full p-3 pl-10 rounded-lg outline-none text-sm">
+                </div>
+            </div>
+            <div id="listaAlunos" class="space-y-3"><p class="empty-state text-center py-12 text-sm uppercase tracking-widest"><i class="fas fa-spinner fa-spin text-4xl mb-4 block opacity-30"></i>Carregando...</p></div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="glass p-6 rounded-2xl max-w-md w-full mx-4 border border-fuchsia-500/30">
+            <h3 class="text-xl font-bold text-fuchsia-400 mb-4 uppercase tracking-wider">Editar Aluno</h3>
+            <input type="hidden" id="editIndex">
+            <div class="space-y-4">
+                <div><label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Nome</label><input type="text" id="editNome" class="w-full p-3 rounded-lg outline-none uppercase"></div>
+                <div><label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Turma</label><select id="editTurma" class="w-full p-3 rounded-lg outline-none"></select></div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div><label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Matrícula</label><input type="date" id="editMatricula" class="w-full p-3 rounded-lg outline-none"></div>
+                    <div><label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Vencimento</label><input type="date" id="editVencimento" class="w-full p-3 rounded-lg outline-none"></div>
+                </div>
+                
+                <!-- NOVO CAMPO: NÍVEL NA EDIÇÃO -->
+                <div>
+                    <label class="block text-[10px] uppercase tracking-wider text-fuchsia-400 mb-2">Nível</label>
+                    <select id="editNivel" class="w-full p-3 rounded-lg outline-none">
+                        <option value="1">⭐ Iniciante</option>
+                        <option value="2">⭐⭐ Básico</option>
+                        <option value="3">⭐⭐⭐ Intermediário</option>
+                        <option value="4">⭐⭐⭐⭐ Avançado</option>
+                        <option value="5">⭐⭐⭐⭐⭐ Elite</option>
+                    </select>
+                </div>
+
+                <div class="pt-4 border-t border-fuchsia-500/10">
+                    <button type="button" onclick="ativarCameraEdicao()" class="w-full bg-blue-500/10 text-blue-400 border border-blue-500/30 p-2 rounded-lg text-[10px] uppercase font-bold hover:bg-blue-500 hover:text-white transition">
+                        <i class="fas fa-camera mr-2"></i>Capturar Novo Rosto
+                    </button>
+                    <div id="cameraContainerEdicao" class="hidden mt-3 flex-col items-center">
+                        <video id="videoEdicao" class="w-full max-w-[300px] rounded-lg border-2 border-blue-500 transform scale-x-[-1]"></video>
+                        <canvas id="canvasEdicao" class="hidden"></canvas>
+                    </div>
+                    <div id="statusFotoEdicao" class="text-[10px] text-emerald-400 mt-2 hidden text-center"><i class="fas fa-check"></i> Nova foto capturada!</div>
+                </div>
+
+                <div class="flex gap-3 mt-6">
+                    <button onclick="fecharModal()" class="flex-1 border border-gray-500 text-gray-400 p-3 rounded-lg uppercase text-xs font-bold hover:bg-gray-800 transition">Cancelar</button>
+                    <button onclick="salvarEdicao()" id="btnSalvarEdicao" class="flex-1 btn-fuchsia p-3 rounded-lg uppercase text-xs font-bold">Salvar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby-23cMovuAZ0m6JouTueAara4JIYnAQVvRImBzhZWMh26gWhm0aB_KiFpRo2t2CcEQCA/exec";
+        let alunos = [];
+        let turmas = [];
+        let stream = null;
+        let streamEdicao = null;
+        let faceData = null;
+
+        function inicializar() {
+            carregarTurmas();
+            sincronizarAlunos();
+        }
+
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
+                    
+                    canvas.width = 400;  
+                    canvas.height = 300;
+                    
+                    const scale = Math.max(canvas.width / img.width, canvas.height / img.height);
+                    const x = (canvas.width / 2) - (img.width / 2) * scale;
+                    const y = (canvas.height / 2) - (img.height / 2) * scale;
+                    
+                    ctx.fillStyle = '#1a1a2e';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, x, y, img.width * scale, img.height * scale);
+                    
+                    faceData = canvas.toDataURL('image/jpeg', 0.9);
+                    
+                    document.getElementById('previewImg').src = faceData;
+                    document.getElementById('previewContainer').classList.remove('hidden');
+                    document.getElementById('previewContainer').classList.add('flex');
+                    document.getElementById('fotoStatus').classList.remove('hidden');
+                    
+                    pararCamera();
+                    document.getElementById('cameraContainer').style.display = 'none';
+                    document.getElementById('btnCamera').innerHTML = '<i class="fas fa-camera"></i>';
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function toggleCamera() {
+            const container = document.getElementById('cameraContainer');
+            const video = document.getElementById('video');
+            const btn = document.getElementById('btnCamera');
+
+            if (stream) {
+                pararCamera();
+                container.style.display = 'none';
+                btn.innerHTML = '<i class="fas fa-camera"></i>';
+                btn.classList.remove('bg-rose-500/20', 'text-rose-400', 'border-rose-500');
+            } else {
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: "user",
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    video.srcObject = stream;
+                    container.style.display = 'flex';
+                    btn.innerHTML = '<i class="fas fa-times"></i>';
+                    btn.classList.add('bg-rose-500/20', 'text-rose-400', 'border-rose-500');
+                } catch (err) {
+                    alert("Câmera não disponível.");
+                }
+            }
+        }
+
+        function pararCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            if (streamEdicao) {
+                streamEdicao.getTracks().forEach(track => track.stop());
+                streamEdicao = null;
+            }
+        }
+
+        function capturarFoto() {
+            const video = document.getElementById('video');
+            const canvas = document.getElementById('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = 400;
+            canvas.height = 300;
+            
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            
+            faceData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            document.getElementById('previewImg').src = faceData;
+            document.getElementById('previewContainer').classList.remove('hidden');
+            document.getElementById('previewContainer').classList.add('flex');
+            document.getElementById('fotoStatus').classList.remove('hidden');
+            
+            if(document.getElementById('editModal').classList.contains('active')) {
+                document.getElementById('statusFotoEdicao').classList.remove('hidden');
+            }
+        }
+
+        async function ativarCameraEdicao() {
+            const container = document.getElementById('cameraContainerEdicao');
+            const video = document.getElementById('videoEdicao');
+            
+            if (streamEdicao) {
+                pararCamera();
+                container.classList.add('hidden');
+                container.classList.remove('flex');
+            } else {
+                try {
+                    streamEdicao = await navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: "user",
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    });
+                    video.srcObject = streamEdicao;
+                    container.classList.remove('hidden');
+                    container.classList.add('flex');
+                    container.scrollIntoView({ behavior: 'smooth' });
+                } catch (err) {
+                    alert("Câmera não disponível.");
+                }
+            }
+        }
+
+        function carregarTurmas() {
+            turmas = JSON.parse(localStorage.getItem('tsunami_turmas')) || [];
+            const selects = [document.getElementById('turma'), document.getElementById('turmaLote'), document.getElementById('editTurma')];
+            selects.forEach(select => {
+                if (!select) return;
+                select.innerHTML = '<option value="">Selecione...</option>';
+                turmas.sort((a, b) => a.nome.localeCompare(b.nome));
+                turmas.forEach(t => {
+                    const option = document.createElement('option');
+                    option.value = t.nome;
+                    option.textContent = t.nome;
+                    select.appendChild(option);
+                });
+            });
+        }
+
+        async function sincronizarAlunos() {
+            const container = document.getElementById('listaAlunos');
+            container.innerHTML = '<p class="empty-state text-center py-12 text-sm uppercase tracking-widest"><i class="fas fa-spinner fa-spin text-4xl mb-4 block opacity-30"></i>Sincronizando...</p>';
+            try {
+                const resposta = await fetch(URL_SCRIPT + '?getDados=alunos');
+                const dados = await resposta.json();
+                if (Array.isArray(dados)) {
+                    alunos = dados;
+                    localStorage.setItem('tsunami_alunos', JSON.stringify(alunos));
+                }
+            } catch (err) {
+                alunos = JSON.parse(localStorage.getItem('tsunami_alunos')) || [];
+            }
+            renderizarAlunos();
+        }
+
+        function renderizarAlunos(filtro = '') {
+            const container = document.getElementById('listaAlunos');
+            const totalEl = document.getElementById('totalAlunos');
+            let lista = alunos.filter(a => a.nome.toLowerCase().includes(filtro.toLowerCase()) || (a.turma && a.turma.toLowerCase().includes(filtro.toLowerCase())));
+            lista.sort((a, b) => a.nome.localeCompare(b.nome));
+            totalEl.textContent = `${lista.length} aluno${lista.length !== 1 ? 's' : ''}`;
+            if (lista.length === 0) {
+                container.innerHTML = `<p class="empty-state text-center py-12 text-sm uppercase tracking-widest">Nenhum aluno encontrado</p>`;
+                return;
+            }
+            
+            const niveis = { '1': '⭐', '2': '⭐⭐', '3': '⭐⭐⭐', '4': '⭐⭐⭐⭐', '5': '⭐⭐⭐⭐⭐' };
+            
+            container.innerHTML = lista.map((aluno, index) => {
+                const alunoIndex = alunos.findIndex(a => a.nome === aluno.nome && a.turma === aluno.turma);
+                const vencido = aluno.data_vencimento ? new Date(aluno.data_vencimento) < new Date() : false;
+                const temFoto = (aluno.face_data && aluno.face_data.length > 100) ? '<i class="fas fa-id-badge text-blue-400 ml-2"></i>' : '';
+                const nivelDisplay = aluno.nivel_aluno ? `<span class="nivel-badge">${niveis[aluno.nivel_aluno] || '⭐'} Nível</span>` : '';
+                
+                return `
+                <div class="aluno-card p-4 rounded-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <h3 class="text-lg font-bold text-fuchsia-300 uppercase tracking-wider mb-1 flex items-center">
+                            ${aluno.nome} ${temFoto} ${nivelDisplay} ${vencido ? '<span class="lote-badge">Vencido</span>' : ''}
+                        </h3>
+                        <div class="flex flex-wrap gap-3 text-xs text-gray-400">
+                            <span><i class="fas fa-users mr-1 text-fuchsia-500"></i>${aluno.turma || 'SEM TURMA'}</span>
+                            <span>Matrícula: ${formatarData(aluno.matricula_rematricula)}</span>
+                            <span class="${vencido ? 'text-rose-400' : 'text-emerald-400'}">Vence: ${formatarData(aluno.data_vencimento)}</span>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="editarAluno(${alunoIndex})" class="edit-btn p-2 rounded-lg bg-amber-500/10 border border-amber-500/30"><i class="fas fa-edit"></i></button>
+                        <button onclick="excluirAluno(${alunoIndex})" class="delete-btn p-2 rounded-lg bg-rose-500/10 border border-rose-500/30"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+
+        function formatarData(data) { 
+            if(!data) return '-';
+            const d = new Date(data);
+            return d.toLocaleDateString('pt-BR', {timeZone: 'UTC'});
+        }
+
+        function switchTab(tab) {
+            document.getElementById('tabIndividual').classList.toggle('active', tab === 'individual');
+            document.getElementById('tabLote').classList.toggle('active', tab === 'lote');
+            document.getElementById('formIndividual').classList.toggle('hidden', tab !== 'individual');
+            document.getElementById('formLote').classList.toggle('hidden', tab !== 'lote');
+        }
+
+        document.getElementById('formAluno').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById('saveBtn');
+            
+            if(stream && !faceData) {
+                capturarFoto();
+                if(!faceData) {
+                    alert("Aguarde a câmera inicializar ou envie um arquivo.");
+                    return;
+                }
+            }
+            
+            const params = new URLSearchParams();
+            params.append('action', 'alunos');
+            params.append('nome', document.getElementById('nome').value.toUpperCase());
+            params.append('turma', document.getElementById('turma').value);
+            params.append('matricula_rematricula', document.getElementById('matricula').value);
+            params.append('data_vencimento', document.getElementById('vencimento').value);
+            params.append('face_data', faceData || "");
+            params.append('nivel_aluno', document.getElementById('nivel_aluno').value || "1"); // NOVO
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try { 
+                await fetch(URL_SCRIPT, { method: 'POST', body: params });
+                alert("Salvo com sucesso!");
+                sincronizarAlunos();
+            } catch (err) { alert("Erro ao salvar."); }
+            
+            e.target.reset();
+            pararCamera();
+            faceData = null;
+            document.getElementById('cameraContainer').style.display = 'none';
+            document.getElementById('previewContainer').classList.add('hidden');
+            document.getElementById('previewContainer').classList.remove('flex');
+            document.getElementById('fotoStatus').classList.add('hidden');
+            document.getElementById('btnCamera').innerHTML = '<i class="fas fa-camera"></i>';
+            btn.innerHTML = '<i class="fas fa-plus"></i>';
+        });
+
+        async function cadastrarLote() {
+            const turma = document.getElementById('turmaLote').value;
+            const matricula = document.getElementById('matriculaLote').value;
+            const vencimento = document.getElementById('vencimentoLote').value;
+            const nivel = document.getElementById('nivelLote').value; // NOVO
+            const nomesTexto = document.getElementById('listaNomesLote').value.trim();
+            
+            if (!turma || !matricula || !vencimento || !nomesTexto) return alert('Preencha tudo!');
+            
+            const nomes = nomesTexto.split('\n').map(n => n.trim().toUpperCase()).filter(n => n.length > 0);
+            const btn = document.getElementById('btnCadastrarLote');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>...';
+            
+            for (const nome of nomes) {
+                const params = new URLSearchParams();
+                params.append('action', 'alunos');
+                params.append('nome', nome);
+                params.append('turma', turma);
+                params.append('matricula_rematricula', matricula);
+                params.append('data_vencimento', vencimento);
+                params.append('face_data', "");
+                params.append('nivel_aluno', nivel); // NOVO
+                try { await fetch(URL_SCRIPT, { method: 'POST', body: params }); } catch (err) {}
+            }
+            
+            sincronizarAlunos();
+            document.getElementById('listaNomesLote').value = '';
+            btn.innerHTML = '<i class="fas fa-users"></i> Cadastrar Todos';
+            alert('Lote finalizado!');
+        }
+
+        function editarAluno(index) {
+            const aluno = alunos[index];
+            faceData = null;
+            document.getElementById('editIndex').value = index;
+            document.getElementById('editNome').value = aluno.nome;
+            document.getElementById('editTurma').value = aluno.turma;
+            document.getElementById('editMatricula').value = aluno.matricula_rematricula;
+            document.getElementById('editVencimento').value = aluno.data_vencimento;
+            document.getElementById('editNivel').value = aluno.nivel_aluno || "1"; // NOVO
+            document.getElementById('statusFotoEdicao').classList.add('hidden');
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function fecharModal() { 
+            document.getElementById('editModal').classList.remove('active'); 
+            pararCamera();
+            document.getElementById('cameraContainerEdicao').classList.add('hidden');
+            document.getElementById('cameraContainerEdicao').classList.remove('flex');
+        }
+
+        async function salvarEdicao() {
+            const index = document.getElementById('editIndex').value;
+            const btn = document.getElementById('btnSalvarEdicao');
+            
+            if(streamEdicao) {
+                const video = document.getElementById('videoEdicao');
+                const canvas = document.getElementById('canvasEdicao');
+                const ctx = canvas.getContext('2d');
+                
+                canvas.width = 400;
+                canvas.height = 300;
+                ctx.translate(canvas.width, 0);
+                ctx.scale(-1, 1);
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                faceData = canvas.toDataURL('image/jpeg', 0.9);
+            }
+            
+            const params = new URLSearchParams();
+            params.append('action', 'alunos');
+            params.append('nome', document.getElementById('editNome').value.toUpperCase());
+            params.append('turma', document.getElementById('editTurma').value);
+            params.append('matricula_rematricula', document.getElementById('editMatricula').value);
+            params.append('data_vencimento', document.getElementById('editVencimento').value);
+            params.append('face_data', faceData || alunos[index].face_data || "");
+            params.append('nivel_aluno', document.getElementById('editNivel').value || "1"); // NOVO
+            
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+            try {
+                await fetch(URL_SCRIPT, { method: 'POST', body: params });
+                alert("Atualizado!");
+                sincronizarAlunos();
+            } catch(e) { alert("Erro!"); }
+            
+            btn.innerHTML = 'Salvar';
+            fecharModal();
+        }
+
+        function excluirAluno(index) {
+            if (!confirm(`Excluir "${alunos[index].nome}"?`)) return;
+            alunos.splice(index, 1);
+            localStorage.setItem('tsunami_alunos', JSON.stringify(alunos));
+            renderizarAlunos();
+        }
+
+        document.getElementById('busca').addEventListener('input', (e) => renderizarAlunos(e.target.value));
+    </script>
+</body>
+</html>

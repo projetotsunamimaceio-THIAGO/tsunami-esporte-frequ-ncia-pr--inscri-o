@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSUNAMI - Gestão</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #07080f;
+            color: white;
+            font-family: 'Segoe UI', sans-serif;
+            min-height: 100vh;
+            min-height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2.5rem 1.25rem;
+        }
+
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(0,255,255,0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0,255,255,0.03) 1px, transparent 1px);
+            background-size: 48px 48px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        header, main, footer { position: relative; z-index: 1; }
+
+        /* ── HEADER ── */
+        header { text-align: center; margin-bottom: 2.5rem; }
+
+        .logo-wrap {
+            display: inline-block;
+            position: relative;
+            margin-bottom: 1.25rem;
+        }
+
+        .logo-img {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 2px solid rgba(0,255,255,0.6);
+            display: block;
+        }
+
+        .logo-ring {
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            border: 1px solid rgba(0,255,255,0.15);
+            animation: spin 12s linear infinite;
+        }
+
+        .logo-ring::before {
+            content: '';
+            position: absolute;
+            top: -2px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #00ffff;
+            box-shadow: 0 0 8px #00ffff;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .brand-title {
+            font-size: clamp(2.4rem, 12vw, 5rem);
+            font-weight: 800;
+            letter-spacing: 0.25em;
+            color: #00ffff;
+            text-shadow: 0 0 40px rgba(0,255,255,0.25), 0 0 80px rgba(0,255,255,0.1);
+            line-height: 1;
+        }
+
+        .brand-sub {
+            margin-top: 0.5rem;
+            font-size: clamp(0.55rem, 2.5vw, 0.65rem);
+            letter-spacing: 0.4em;
+            color: rgba(0,255,255,0.5);
+            text-transform: uppercase;
+        }
+
+        .brand-line {
+            width: 60px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #00ffff, transparent);
+            margin: 0.75rem auto 0;
+        }
+
+        /* ── GRID ── */
+        .nav-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 0.75rem;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        /* Last card (5th) spans full width on mobile */
+        .nav-card:last-child {
+            grid-column: 1 / -1;
+        }
+
+        .nav-card {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+            padding: 1.1rem 1rem 1rem;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.07);
+            text-decoration: none;
+            transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+            position: relative;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+            min-height: 80px;
+        }
+
+        .nav-card::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 2px;
+            background: var(--accent);
+            opacity: 0.7;
+            border-radius: 14px 14px 0 0;
+            transition: opacity 0.18s;
+        }
+
+        .nav-card:hover,
+        .nav-card:active {
+            transform: translateY(-2px);
+            background: rgba(255,255,255,0.06);
+            border-color: rgba(255,255,255,0.14);
+        }
+
+        .nav-card:hover::after,
+        .nav-card:active::after { opacity: 1; }
+
+        .card-icon {
+            font-size: 1.5rem;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .card-label {
+            font-size: clamp(0.65rem, 2.8vw, 0.72rem);
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--accent);
+            opacity: 0.9;
+        }
+
+        .card-arrow {
+            position: absolute;
+            bottom: 0.85rem;
+            right: 0.85rem;
+            font-size: 0.65rem;
+            color: rgba(255,255,255,0.15);
+            transition: color 0.18s, transform 0.18s;
+        }
+
+        .nav-card:hover .card-arrow,
+        .nav-card:active .card-arrow {
+            color: var(--accent);
+            transform: translate(2px, -2px);
+        }
+
+        /* accent colors per card */
+        .c-cyan    { --accent: #00e5ff; }
+        .c-fuchsia { --accent: #e040fb; }
+        .c-violet  { --accent: #b39ddb; }
+        .c-emerald { --accent: #00e676; }
+        .c-blue    { --accent: #448aff; }
+
+        /* ── FOOTER ── */
+        footer { margin-top: 2rem; }
+
+        .logout-btn {
+            background: none;
+            border: none;
+            color: rgba(239,83,80,0.5);
+            font-size: clamp(0.6rem, 2.5vw, 0.65rem);
+            font-weight: 700;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            cursor: pointer;
+            transition: color 0.15s;
+            padding: 0.5rem 1rem;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .logout-btn:hover,
+        .logout-btn:active { color: #ef5350; }
+
+        /* ── DESKTOP override ── */
+        @media (min-width: 600px) {
+            .logo-img { width: 110px; height: 110px; }
+
+            .nav-grid {
+                grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+                max-width: 700px;
+                gap: 1rem;
+            }
+
+            .nav-card:last-child {
+                grid-column: auto;
+            }
+
+            .nav-card { min-height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <script>
+        if (sessionStorage.getItem('tsunami_logged') !== 'true') { window.location.href = 'login.html'; }
+        function logout() { sessionStorage.removeItem('tsunami_logged'); window.location.href = 'login.html'; }
+    </script>
+
+    <header>
+        <div class="logo-wrap">
+            <img src="logo.png" alt="Logo Tsunami" class="logo-img"
+                 onerror="this.src='https://via.placeholder.com/110/07080f/00ffff?text=T'">
+            <span class="logo-ring"></span>
+        </div>
+        <div class="brand-title">TSUNAMI</div>
+        <div class="brand-sub">Frequência &amp; Gestão</div>
+        <div class="brand-line"></div>
+    </header>
+
+    <main>
+        <div class="nav-grid">
+
+            <a href="turmas.html" class="nav-card c-cyan">
+                <i class="fas fa-users-cog card-icon"></i>
+                <span class="card-label">Turmas</span>
+                <i class="fas fa-arrow-up-right card-arrow"></i>
+            </a>
+
+            <a href="alunos.html" class="nav-card c-fuchsia">
+                <i class="fas fa-user-plus card-icon"></i>
+                <span class="card-label">Alunos</span>
+                <i class="fas fa-arrow-up-right card-arrow"></i>
+            </a>
+
+            <a href="relatorio.html" class="nav-card c-violet">
+                <i class="fas fa-chart-pie card-icon"></i>
+                <span class="card-label">Relatórios</span>
+                <i class="fas fa-arrow-up-right card-arrow"></i>
+            </a>
+
+            <a href="arena.html" class="nav-card c-emerald">
+                <i class="fas fa-check-double card-icon"></i>
+                <span class="card-label">Arena</span>
+                <i class="fas fa-arrow-up-right card-arrow"></i>
+            </a>
+
+            <a href="arena_facial.html" class="nav-card c-blue">
+                <i class="fas fa-camera card-icon"></i>
+                <span class="card-label">Facial Arena</span>
+                <i class="fas fa-arrow-up-right card-arrow"></i>
+            </a>
+
+        </div>
+    </main>
+
+    <footer>
+        <button class="logout-btn" onclick="logout()">Sair do sistema</button>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,45 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default deny rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Connection test collection
+    match /test/connection {
+      allow read, write: if true;
+    }
+
+    // Turmas collection
+    match /turmas/{turmaId} {
+      allow read, write: if true;
+    }
+
+    // Alunos collection
+    match /alunos/{alunoId} {
+      allow read, write: if true;
+    }
+
+    // Frequencia collection
+    match /frequencia/{frequenciaId} {
+      allow read, write: if true;
+    }
+
+    // Usuarios collection
+    match /usuarios/{usuarioId} {
+      allow read, write: if true;
+    }
+
+    // Programacao collection
+    match /programacao/{itemId} {
+      allow read, write: if true;
+    }
+
+    // Permissoes Esporte collection
+    match /permissoes_esporte/{permissaoId} {
+      allow read, write: if true;
+    }
+  }
+}

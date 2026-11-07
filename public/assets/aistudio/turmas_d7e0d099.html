@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TSUNAMI - Turmas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%); 
+            color: white; 
+            font-family: 'Segoe UI', sans-serif; 
+            min-height: 100vh;
+        }
+        .glass { 
+            background: rgba(255, 255, 255, 0.03); 
+            backdrop-filter: blur(10px); 
+            border: 1px solid rgba(0, 255, 255, 0.1); 
+        }
+        .btn-cyan { 
+            border: 1px solid #00ffff; 
+            background: rgba(0, 255, 255, 0.1); 
+            transition: all 0.3s; 
+            color: #00ffff; 
+        }
+        .btn-cyan:hover { 
+            background: #00ffff; 
+            color: black; 
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+        }
+        .day-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(0, 255, 255, 0.2);
+            color: #00ffff;
+            transition: all 0.3s;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+        .day-btn.selected {
+            background: #00ffff;
+            color: black;
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.4);
+        }
+        .turma-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(0, 255, 255, 0.1);
+            border-left: 4px solid #00ffff;
+            transition: all 0.3s;
+        }
+        .turma-card:hover {
+            background: rgba(0, 255, 255, 0.05);
+            transform: translateX(5px);
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal.active { display: flex; }
+    </style>
+</head>
+<body class="p-4 md:p-8">
+    <script>if (sessionStorage.getItem('tsunami_logged') !== 'true') { window.location.href = 'login.html'; }</script>
+
+    <div class="max-w-6xl mx-auto">
+        <div class="flex justify-between items-center mb-8">
+            <a href="index.html" class="btn-cyan px-4 py-2 rounded-lg text-xs uppercase font-bold">
+                <i class="fas fa-arrow-left mr-2"></i>Voltar
+            </a>
+            <h1 class="text-2xl md:text-3xl font-bold text-cyan-400 tracking-widest uppercase text-center flex-1">
+                <i class="fas fa-users-cog mr-3"></i>Gerenciar Turmas
+            </h1>
+            <div class="w-20"></div>
+        </div>
+
+        <div class="glass p-6 rounded-2xl mb-8">
+            <h2 class="text-sm uppercase tracking-[0.3em] text-cyan-300 mb-6 border-b border-cyan-500/20 pb-2">
+                Nova Turma
+            </h2>
+            
+            <form id="formTurma" class="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                <div class="md:col-span-3">
+                    <label class="block text-[10px] uppercase tracking-wider text-cyan-400 mb-2">Nome da Turma</label>
+                    <input type="text" id="nome" placeholder="Ex: SUB-15" class="w-full p-3 rounded-lg outline-none uppercase bg-gray-900 border border-cyan-500/30" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-cyan-400 mb-2">Início</label>
+                    <input type="time" id="inicio" class="w-full p-3 rounded-lg outline-none bg-gray-900 border border-cyan-500/30" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-cyan-400 mb-2">Término</label>
+                    <input type="time" id="fim" class="w-full p-3 rounded-lg outline-none bg-gray-900 border border-cyan-500/30" required>
+                </div>
+                <div class="md:col-span-2">
+                    <label class="block text-[10px] uppercase tracking-wider text-cyan-400 mb-2">Vagas</label>
+                    <input type="number" id="vagas" placeholder="20" min="1" class="w-full p-3 rounded-lg outline-none bg-gray-900 border border-cyan-500/30" required>
+                </div>
+                <div class="md:col-span-3">
+                    <button type="submit" id="saveBtn" class="w-full btn-cyan p-3 rounded-lg uppercase font-bold tracking-wider">
+                        <i class="fas fa-plus mr-2"></i>Criar
+                    </button>
+                </div>
+                <div class="md:col-span-12 mt-4">
+                    <label class="block text-[10px] uppercase tracking-wider text-cyan-400 mb-3">Dias de Treino</label>
+                    <div class="flex flex-wrap gap-2" id="diasContainer">
+                        <button type="button" class="day-btn" data-dia="Seg">Seg</button>
+                        <button type="button" class="day-btn" data-dia="Ter">Ter</button>
+                        <button type="button" class="day-btn" data-dia="Qua">Qua</button>
+                        <button type="button" class="day-btn" data-dia="Qui">Qui</button>
+                        <button type="button" class="day-btn" data-dia="Sex">Sex</button>
+                        <button type="button" class="day-btn" data-dia="Sáb">Sáb</button>
+                        <button type="button" class="day-btn" data-dia="Dom">Dom</button>
+                    </div>
+                    <input type="hidden" id="dias" required>
+                </div>
+            </form>
+        </div>
+
+        <div class="glass p-6 rounded-2xl">
+            <h2 class="text-sm uppercase tracking-[0.3em] text-cyan-300 mb-6 border-b border-cyan-500/20 pb-2 flex justify-between items-center">
+                <span>Turmas Cadastradas</span>
+                <button onclick="sincronizarTurmas()" class="text-xs bg-cyan-500/20 px-3 py-1 rounded-full hover:bg-cyan-500/30 transition">
+                    <i class="fas fa-sync mr-1"></i>Sincronizar
+                </button>
+            </h2>
+            <div id="listaTurmas" class="space-y-3">
+                <p class="text-center py-12 text-cyan-400/40 text-sm uppercase">
+                    <i class="fas fa-spinner fa-spin mr-2"></i>Carregando...
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="editModal" class="modal">
+        <div class="glass p-6 rounded-2xl max-w-md w-full mx-4 border border-cyan-500/30">
+            <h3 class="text-xl font-bold text-cyan-400 mb-4 uppercase">Editar Turma</h3>
+            <input type="hidden" id="editIndex">
+            <input type="text" id="editNome" class="w-full p-3 rounded-lg outline-none uppercase bg-gray-900 border border-cyan-500/30 mb-4">
+            <div class="flex gap-3">
+                <button onclick="fecharModal()" class="flex-1 border border-gray-500 text-gray-400 p-3 rounded-lg uppercase text-xs font-bold">Cancelar</button>
+                <button onclick="salvarEdicao()" class="flex-1 btn-cyan p-3 rounded-lg uppercase text-xs font-bold">Salvar</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const URL_SCRIPT = "https://script.google.com/macros/s/AKfycby-23cMovuAZ0m6JouTueAara4JIYnAQVvRImBzhZWMh26gWhm0aB_KiFpRo2t2CcEQCA/exec";
+        let turmas = [];
+
+        // ========== SINCRONIZAR TURMAS DA PLANILHA ==========
+        async function sincronizarTurmas() {
+            const container = document.getElementById('listaTurmas');
+            container.innerHTML = '<p class="text-center py-12 text-cyan-400/40 text-sm uppercase"><i class="fas fa-spinner fa-spin mr-2"></i>Sincronizando...</p>';
+            
+            try {
+                const resposta = await fetch(URL_SCRIPT + '?getDados=turmas');
+                const dados = await resposta.json();
+                
+                if (Array.isArray(dados)) {
+                    turmas = dados;
+                    localStorage.setItem('tsunami_turmas', JSON.stringify(turmas));
+                } else {
+                    // Fallback para local
+                    turmas = JSON.parse(localStorage.getItem('tsunami_turmas')) || [];
+                }
+            } catch (err) {
+                console.log('Erro ao sincronizar:', err);
+                turmas = JSON.parse(localStorage.getItem('tsunami_turmas')) || [];
+            }
+            
+            renderizarTurmas();
+        }
+
+        // Seleção de dias
+        document.querySelectorAll('.day-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                this.classList.toggle('selected');
+                const selecionados = Array.from(document.querySelectorAll('.day-btn.selected'))
+                    .map(b => b.dataset.dia);
+                document.getElementById('dias').value = selecionados.join('/');
+            });
+        });
+
+        function renderizarTurmas() {
+            const container = document.getElementById('listaTurmas');
+            
+            if (turmas.length === 0) {
+                container.innerHTML = '<p class="text-center py-12 text-cyan-400/40 text-sm uppercase">Nenhuma turma registrada</p>';
+                return;
+            }
+
+            turmas.sort((a, b) => a.nome.localeCompare(b.nome));
+            
+            container.innerHTML = turmas.map((t, i) => `
+                <div class="turma-card p-4 rounded-xl flex justify-between items-center">
+                    <div>
+                        <h3 class="text-lg font-bold text-cyan-300 uppercase">${t.nome}</h3>
+                        <div class="text-xs text-gray-400 mt-1">
+                            <i class="far fa-clock mr-1"></i>${t.inicio} às ${t.fim} | 
+                            <i class="far fa-calendar mr-1"></i>${t.dias} | 
+                            <i class="fas fa-users mr-1"></i>${t.vagas} vagas
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="editarTurma(${i})" class="p-2 rounded bg-amber-500/10 text-amber-400 border border-amber-500/30">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button onclick="excluirTurma(${i})" class="p-2 rounded bg-rose-500/10 text-rose-400 border border-rose-500/30">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function enviarParaPlanilha(dados) {
+            const formData = new FormData();
+            for (const [k, v] of Object.entries(dados)) formData.append(k, v);
+            await fetch(URL_SCRIPT, { method: 'POST', body: formData });
+        }
+
+        document.getElementById('formTurma').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            if (!document.getElementById('dias').value) return alert('Selecione os dias!');
+            
+            const nova = {
+                action: "turmas",
+                nome: document.getElementById('nome').value.toUpperCase(),
+                inicio: document.getElementById('inicio').value,
+                fim: document.getElementById('fim').value,
+                vagas: document.getElementById('vagas').value,
+                dias: document.getElementById('dias').value
+            };
+
+            turmas.push({ nome: nova.nome, inicio: nova.inicio, fim: nova.fim, vagas: nova.vagas, dias: nova.dias });
+            localStorage.setItem('tsunami_turmas', JSON.stringify(turmas));
+            
+            try { await enviarParaPlanilha(nova); } catch (err) { console.error(err); }
+            
+            e.target.reset();
+            document.querySelectorAll('.day-btn').forEach(b => b.classList.remove('selected'));
+            document.getElementById('dias').value = '';
+            renderizarTurmas();
+        });
+
+        function editarTurma(i) {
+            document.getElementById('editIndex').value = i;
+            document.getElementById('editNome').value = turmas[i].nome;
+            document.getElementById('editModal').classList.add('active');
+        }
+
+        function fecharModal() {
+            document.getElementById('editModal').classList.remove('active');
+        }
+
+        async function salvarEdicao() {
+            const i = document.getElementById('editIndex').value;
+            turmas[i].nome = document.getElementById('editNome').value.toUpperCase();
+            localStorage.setItem('tsunami_turmas', JSON.stringify(turmas));
+            await enviarParaPlanilha({ ...turmas[i], action: "turmas", observacao: "EDITADO" });
+            fecharModal();
+            renderizarTurmas();
+        }
+
+        function excluirTurma(i) {
+            if (!confirm('Excluir turma?')) return;
+            turmas.splice(i, 1);
+            localStorage.setItem('tsunami_turmas', JSON.stringify(turmas));
+            renderizarTurmas();
+        }
+
+        // Inicializa
+        sincronizarTurmas();
+    </script>
+</body>
+</html>

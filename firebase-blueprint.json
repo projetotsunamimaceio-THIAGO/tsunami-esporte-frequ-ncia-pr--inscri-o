@@ -1,0 +1,92 @@
+{
+  "entities": {
+    "Turma": {
+      "title": "Turma",
+      "description": "Turmas de treino do Projeto Tsunami",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "inicio": { "type": "string" },
+        "fim": { "type": "string" },
+        "vagas": { "type": "string" },
+        "dias": { "type": "string" }
+      },
+      "required": ["nome"]
+    },
+    "Aluno": {
+      "title": "Aluno",
+      "description": "Atletas cadastrados no Projeto Tsunami",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "turma": { "type": "string" },
+        "matricula_rematricula": { "type": "string" },
+        "data_vencimento": { "type": "string" },
+        "face_data": { "type": "string" },
+        "nivel_aluno": { "type": "string" },
+        "senha": { "type": "string" }
+      },
+      "required": ["nome"]
+    },
+    "Frequencia": {
+      "title": "Frequencia",
+      "description": "Registro de presença das aulas de sábado",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "data_aula": { "type": "string" },
+        "status": { "type": "string" },
+        "justificativa": { "type": "string" },
+        "hora": { "type": "string" }
+      },
+      "required": ["nome", "data_aula", "status"]
+    },
+    "Usuario": {
+      "title": "Usuario",
+      "description": "Usuários administrativos do sistema Tsunami",
+      "type": "object",
+      "properties": {
+        "nome": { "type": "string" },
+        "senha": { "type": "string" }
+      },
+      "required": ["nome", "senha"]
+    },
+    "ProgramacaoItem": {
+      "title": "ProgramacaoItem",
+      "description": "Itens da programação esportiva e célula evangélica",
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "isFixa": { "type": "boolean" },
+        "hora": { "type": "string" },
+        "dias": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["titulo", "hora", "dias"]
+    }
+  },
+  "firestore": {
+    "/turmas/{turmaId}": {
+      "schema": { "$ref": "#/entities/Turma" },
+      "description": "Coleção de turmas do projeto"
+    },
+    "/alunos/{alunoId}": {
+      "schema": { "$ref": "#/entities/Aluno" },
+      "description": "Coleção de alunos cadastrados"
+    },
+    "/frequencia/{frequenciaId}": {
+      "schema": { "$ref": "#/entities/Frequencia" },
+      "description": "Registros de frequência das arenas"
+    },
+    "/usuarios/{usuarioId}": {
+      "schema": { "$ref": "#/entities/Usuario" },
+      "description": "Credenciais de acesso dos administradores"
+    },
+    "/programacao/{itemId}": {
+      "schema": { "$ref": "#/entities/ProgramacaoItem" },
+      "description": "Programação semanal de atividades e célula"
+    }
+  }
+}

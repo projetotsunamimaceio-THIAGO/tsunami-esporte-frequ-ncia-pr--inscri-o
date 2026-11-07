@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .font-teko {
+    font-family: 'Teko', sans-serif;
+  }
+  .font-rajdhani {
+    font-family: 'Rajdhani', sans-serif;
+  }
+  .font-chakra {
+    font-family: 'Chakra Petch', sans-serif;
+  }
+}
+
+/* Custom glowing effects and circuit background animations */
+.glow-cyan-box {
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.45), inset 0 0 15px rgba(6, 182, 212, 0.2);
+}
+
+.glow-purple-box {
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.45), inset 0 0 15px rgba(168, 85, 247, 0.2);
+}
+
+.glow-text-cyan {
+  text-shadow: 0 0 12px rgba(6, 182, 212, 0.7);
+}
+
+.circuit-bg {
+  background-color: #040914;
+  background-image: 
+    radial-gradient(circle at 50% 30%, rgba(6, 182, 212, 0.12) 0%, transparent 60%),
+    radial-gradient(circle at 80% 50%, rgba(168, 85, 247, 0.08) 0%, transparent 50%),
+    radial-gradient(circle at 20% 70%, rgba(6, 182, 212, 0.08) 0%, transparent 50%);
+}
+
+@keyframes scanBeam {
+  0% { top: 5%; }
+  50% { top: 85%; }
+  100% { top: 5%; }
+}
+
+.animate-scan-beam {
+  animation: scanBeam 2.2s ease-in-out infinite;
+}

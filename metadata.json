@@ -1,0 +1,6 @@
+{
+  "name": "Projeto Tsunami",
+  "description": "Educação, esporte e disciplina - Arena Sede Sara Nossa Terra Maceió - AL",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
