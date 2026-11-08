@@ -405,7 +405,8 @@ export async function getFirestoreProgramacao(): Promise<ProgramacaoItem[]> {
         titulo: data.titulo || '',
         isFixa: !!data.isFixa,
         hora: data.hora || '',
-        dias: Array.isArray(data.dias) ? data.dias : []
+        dias: Array.isArray(data.dias) ? data.dias : [],
+        vagas: data.vagas ? Number(data.vagas) : 15
       });
     });
     return list;
@@ -424,6 +425,7 @@ export async function saveFirestoreProgramacao(item: ProgramacaoItem): Promise<v
       isFixa: !!item.isFixa,
       hora: item.hora || '',
       dias: item.dias || [],
+      vagas: item.vagas ? Number(item.vagas) : 15,
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -451,7 +453,8 @@ export function subscribeFirestoreProgramacao(onUpdate: (items: ProgramacaoItem[
         titulo: data.titulo || '',
         isFixa: !!data.isFixa,
         hora: data.hora || '',
-        dias: Array.isArray(data.dias) ? data.dias : []
+        dias: Array.isArray(data.dias) ? data.dias : [],
+        vagas: data.vagas ? Number(data.vagas) : 15
       });
     });
     onUpdate(list);

@@ -138,6 +138,15 @@ export function ListaInscricoesWidget() {
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(texto)}`);
   };
 
+  const getVagasPadrao = (act: ProgramacaoItem) => {
+    if (act.vagas && act.vagas > 0) return act.vagas;
+    const t = act.titulo.toUpperCase();
+    if (t.includes('VOLEI') || t.includes('VOLEIBOL')) return 15;
+    if (t.includes('ALTINHA')) return 5;
+    if (t.includes('FUTSAL 2X2')) return 10;
+    return 15;
+  };
+
   return (
     <div className="w-full max-w-4xl mx-auto my-8 space-y-6">
       
@@ -159,7 +168,7 @@ export function ListaInscricoesWidget() {
         ) : (
           atividades.map((act) => {
             const isCelula = act.isFixa || act.id === 'celula_fixa' || act.titulo.toUpperCase().includes('CÉLULA') || act.titulo.toUpperCase().includes('CELULA');
-            const vagasTotais = isCelula ? 100 : (act.vagas || 15);
+            const vagasTotais = isCelula ? 100 : getVagasPadrao(act);
             const inscritos = getInscritosPorAtividade(act.titulo, isCelula);
             const qtdInscritos = inscritos.length;
             const confirmados = inscritos.slice(0, vagasTotais);

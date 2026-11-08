@@ -67,9 +67,10 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   const [showModal, setShowModal] = useState<boolean>(false);
   const [novoTitulo, setNovoTitulo] = useState<string>('');
   const [novaHora, setNovaHora] = useState<string>('18:00');
+  const [novasVagas, setNovasVagas] = useState<number>(15);
   const [novosDias, setNovosDias] = useState<string[]>(['seg', 'ter', 'qua', 'qui', 'sex']);
 
-  // Modal para editar título de atividade existente
+  // Modal para editar atividade existente
   const [editingItem, setEditingItem] = useState<ProgramacaoItem | null>(null);
 
   // Subscrever ao Firestore em tempo real
@@ -84,7 +85,8 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
           titulo: 'CÉLULA EVANGELÍSTICA TSUNAMI',
           isFixa: true,
           hora: '19:30',
-          dias: ['seg', 'qua', 'sex']
+          dias: ['seg', 'qua', 'sex'],
+          vagas: 100
         };
         await saveFirestoreProgramacao(defaultCelula);
         initialList.push(defaultCelula);
@@ -121,7 +123,8 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     titulo: 'CÉLULA EVANGELÍSTICA TSUNAMI',
     isFixa: true,
     hora: '19:30',
-    dias: ['seg', 'qua', 'sex']
+    dias: ['seg', 'qua', 'sex'],
+    vagas: 100
   };
 
   // Atividades dinâmicas de esporte
@@ -156,6 +159,19 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     triggerSuccessAnimation(item.id);
   };
 
+  // Alterar quantidade de vagas de um item
+  const handleVagasChange = async (item: ProgramacaoItem, novaVagaVal: number) => {
+    const val = Math.max(1, novaVagaVal || 1);
+    const itemAtualizado: ProgramacaoItem = {
+      ...item,
+      vagas: val
+    };
+
+    setItems(prev => prev.map(i => i.id === item.id ? itemAtualizado : i));
+    await saveFirestoreProgramacao(itemAtualizado);
+    triggerSuccessAnimation(item.id);
+  };
+
   // Criar nova atividade dinâmica (+ ATIVIDADE)
   const handleAdicionarAtividade = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -166,6 +182,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
       titulo: tituloFinal,
       isFixa: false,
       hora: novaHora || '18:00',
+      vagas: Number(novasVagas) > 0 ? Number(novasVagas) : 15,
       dias: novosDias.length > 0 ? novosDias : ['seg', 'ter', 'qua', 'qui', 'sex']
     };
 
@@ -173,6 +190,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     setShowModal(false);
     setNovoTitulo('');
     setNovaHora('18:00');
+    setNovasVagas(15);
     setNovosDias(['seg', 'ter', 'qua', 'qui', 'sex']);
     triggerSuccessAnimation(nova.id);
   };
@@ -573,35 +591,51 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                       </div>
                     </div>
 
-                    {/* Hora & Dias */}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
+                    {/* Hora, Vagas & Dias */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
                       
                       {/* Hora */}
-                      <div className="md:col-span-4 bg-gray-900/80 border border-yellow-500/30 rounded-xl p-3 flex items-center justify-between gap-2">
+                      <div className="md:col-span-3 bg-gray-900/80 border border-yellow-500/30 rounded-xl p-3 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-yellow-400 font-bold uppercase text-xs">
                           <Clock className="w-4 h-4" />
                           <span>Hora:</span>
                         </div>
                         <div className="flex items-center text-yellow-400 font-mono font-bold text-base">
-                          <span className="text-gray-400 text-xs mr-1">(</span>
                           <input 
                             type="time" 
                             value={item.hora || '18:00'}
                             onChange={(e) => handleHoraChange(item, e.target.value)}
                             className="bg-black/60 border border-yellow-500/30 text-yellow-400 font-mono text-sm px-2 py-1 rounded outline-none focus:border-yellow-400 text-center cursor-pointer"
                           />
-                          <span className="text-gray-400 text-xs ml-1">)</span>
+                        </div>
+                      </div>
+
+                      {/* Vagas */}
+                      <div className="md:col-span-3 bg-gray-900/80 border border-yellow-500/30 rounded-xl p-3 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-yellow-400 font-bold uppercase text-xs">
+                          <Trophy className="w-4 h-4" />
+                          <span>VAGAS:</span>
+                        </div>
+                        <div className="flex items-center text-yellow-400 font-mono font-bold text-base">
+                          <input 
+                            type="number" 
+                            min="1"
+                            max="500"
+                            value={item.vagas || 15}
+                            onChange={(e) => handleVagasChange(item, parseInt(e.target.value) || 1)}
+                            className="w-16 bg-black/60 border border-yellow-500/30 text-yellow-400 font-mono text-sm px-2 py-1 rounded outline-none focus:border-yellow-400 text-center font-bold"
+                          />
                         </div>
                       </div>
 
                       {/* Dias */}
-                      <div className="md:col-span-8 bg-gray-900/80 border border-yellow-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="md:col-span-6 bg-gray-900/80 border border-yellow-500/30 rounded-xl p-3 flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-yellow-400 font-bold uppercase text-xs">
                           <Calendar className="w-4 h-4" />
                           <span>dia:</span>
                         </div>
 
-                        <div className="flex flex-wrap gap-1.5 md:gap-2">
+                        <div className="flex flex-wrap gap-1 md:gap-1.5">
                           {DIAS_SEMANA.map((d) => {
                             const isSelected = item.dias.includes(d.key);
                             return (
@@ -609,7 +643,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                                 key={d.key}
                                 type="button"
                                 onClick={() => handleToggleDia(item, d.key)}
-                                className={`px-2.5 py-1.5 rounded-lg text-xs font-black uppercase transition-all duration-200 cursor-pointer ${
+                                className={`px-2 py-1 rounded-lg text-xs font-black uppercase transition-all duration-200 cursor-pointer ${
                                   isSelected
                                     ? 'bg-yellow-400 text-black shadow-[0_0_10px_rgba(234,179,8,0.5)] scale-105'
                                     : 'bg-gray-800/80 border border-yellow-500/20 text-gray-400 hover:text-white hover:border-yellow-400/50'
@@ -954,17 +988,34 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                 />
               </div>
 
-              <div>
-                <label className="block text-xs uppercase text-yellow-400 font-bold mb-2">
-                  Horário (   :  )
-                </label>
-                <input 
-                  type="time"
-                  value={novaHora}
-                  onChange={e => setNovaHora(e.target.value)}
-                  className="w-full p-3.5 rounded-xl bg-gray-900 border border-yellow-500/40 text-yellow-400 font-mono font-bold text-lg outline-none focus:border-yellow-400 text-center cursor-pointer"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs uppercase text-yellow-400 font-bold mb-2">
+                    Horário (HH:MM)
+                  </label>
+                  <input 
+                    type="time"
+                    value={novaHora}
+                    onChange={e => setNovaHora(e.target.value)}
+                    className="w-full p-3.5 rounded-xl bg-gray-900 border border-yellow-500/40 text-yellow-400 font-mono font-bold text-lg outline-none focus:border-yellow-400 text-center cursor-pointer"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase text-yellow-400 font-bold mb-2">
+                    Vagas Disponíveis
+                  </label>
+                  <input 
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={novasVagas}
+                    onChange={e => setNovasVagas(parseInt(e.target.value) || 1)}
+                    className="w-full p-3.5 rounded-xl bg-gray-900 border border-yellow-500/40 text-yellow-400 font-mono font-bold text-lg outline-none focus:border-yellow-400 text-center font-extrabold"
+                    required
+                  />
+                </div>
               </div>
 
               <div>
@@ -1013,14 +1064,14 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
       )}
 
       {/* ======================================================== */}
-      {/* MODAL 2: EDITAR TÍTULO DA ATIVIDADE */}
+      {/* MODAL 2: EDITAR ATIVIDADE */}
       {/* ======================================================== */}
       {editingItem && (
         <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#0f1224] border-2 border-yellow-400 p-6 rounded-3xl max-w-md w-full shadow-2xl">
             <h3 className="text-xl font-bold text-yellow-400 uppercase tracking-wider mb-4 flex items-center gap-2">
               <Edit2 className="w-5 h-5" />
-              <span>Editar Nome da Atividade</span>
+              <span>Editar Atividade</span>
             </h3>
 
             <form onSubmit={handleSalvarTituloEditado} className="space-y-4">
@@ -1035,6 +1086,36 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                   className="w-full p-3.5 rounded-xl bg-gray-900 border border-yellow-500/40 text-white outline-none focus:border-yellow-400 font-bold text-sm uppercase"
                   required
                 />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs uppercase text-yellow-400 font-bold mb-1">
+                    Horário
+                  </label>
+                  <input 
+                    type="time"
+                    value={editingItem.hora || '18:00'}
+                    onChange={e => setEditingItem({ ...editingItem, hora: e.target.value })}
+                    className="w-full p-3 rounded-xl bg-gray-900 border border-yellow-500/40 text-yellow-400 font-mono font-bold text-base outline-none focus:border-yellow-400 text-center cursor-pointer"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs uppercase text-yellow-400 font-bold mb-1">
+                    Vagas
+                  </label>
+                  <input 
+                    type="number"
+                    min="1"
+                    max="500"
+                    value={editingItem.vagas || 15}
+                    onChange={e => setEditingItem({ ...editingItem, vagas: parseInt(e.target.value) || 1 })}
+                    className="w-full p-3 rounded-xl bg-gray-900 border border-yellow-500/40 text-yellow-400 font-mono font-bold text-base outline-none focus:border-yellow-400 text-center font-extrabold"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="flex gap-3 pt-3">
