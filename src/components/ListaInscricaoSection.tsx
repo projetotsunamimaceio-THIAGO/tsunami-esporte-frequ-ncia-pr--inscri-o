@@ -128,6 +128,7 @@ export function ListaInscricaoSection() {
             const inscritosUnicos = [...new Set(inscritos)];
             const countInscritos = inscritosUnicos.length;
             const vagasRestantes = isCelula ? Math.max(0, 100 - countInscritos) : Math.max(0, vagasTotais - countInscritos);
+            const emEspera = !isCelula && countInscritos > vagasTotais ? (countInscritos - vagasTotais) : 0;
             const percentual = isCelula ? Math.min(100, Math.round((countInscritos / 100) * 100)) : Math.min(100, Math.round((countInscritos / vagasTotais) * 100));
 
             return (
@@ -136,6 +137,8 @@ export function ListaInscricaoSection() {
                 className={`border rounded-2xl p-5 shadow-lg space-y-4 text-left transition ${
                   isCelula
                     ? 'bg-[#120e06] border-amber-500/60 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                    : emEspera > 0
+                    ? 'bg-[#1a0810] border-rose-500/80 hover:border-rose-400 shadow-[0_0_25px_rgba(244,63,94,0.2)]'
                     : 'bg-[#080d19] border-emerald-500/40'
                 }`}
               >
@@ -152,6 +155,10 @@ export function ListaInscricaoSection() {
                         <span className="bg-amber-500/20 border border-amber-400 text-amber-300 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase font-mono">
                           PRESENÇA OBRIGATÓRIA
                         </span>
+                      ) : emEspera > 0 ? (
+                        <span className="bg-rose-500/30 border border-rose-400 text-rose-300 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase font-mono animate-pulse">
+                          ⚠️ {emEspera} NA LISTA DE ESPERA
+                        </span>
                       ) : (
                         <span className="bg-emerald-500/15 border border-emerald-400 text-emerald-300 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase font-mono">
                           {vagasTotais} VAGAS
@@ -159,7 +166,7 @@ export function ListaInscricaoSection() {
                       )}
                     </div>
                     <p className="text-xs font-mono text-gray-400 mt-1 flex items-center gap-1">
-                      <Clock className={`w-3.5 h-3.5 ${isCelula ? 'text-amber-400' : 'text-emerald-400'}`} />
+                      <Clock className={`w-3.5 h-3.5 ${isCelula ? 'text-amber-400' : emEspera > 0 ? 'text-rose-400' : 'text-emerald-400'}`} />
                       {act.hora || (isCelula ? '19:45' : '20:00')}
                     </p>
                   </div>
@@ -183,26 +190,40 @@ export function ListaInscricaoSection() {
                 {/* Capacity Stats & Bar */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                    <span className={isCelula ? 'text-amber-400' : 'text-emerald-400'}>
-                      {isCelula ? `${countInscritos} CONFIRMADOS NA CÉLULA` : `${vagasRestantes} VAGAS RESTANTES`}
+                    <span className={isCelula ? 'text-amber-400' : emEspera > 0 ? 'text-rose-400 font-black' : 'text-emerald-400'}>
+                      {isCelula 
+                        ? `${countInscritos} CONFIRMADOS NA CÉLULA` 
+                        : emEspera > 0 
+                        ? `⚠️ VAGAS PREENCHIDAS (${vagasTotais}/${vagasTotais}) • ${emEspera} NA LISTA DE ESPERA`
+                        : `${vagasRestantes} VAGAS RESTANTES`}
                     </span>
                     <span className="text-gray-400 font-mono">
-                      {countInscritos} CONFIRMAÇÕES
+                      {countInscritos} / {vagasTotais} INSCRITOS
                     </span>
                   </div>
 
                   <div className="w-full bg-gray-950 border border-gray-800 rounded-full h-2 overflow-hidden p-0.5">
                     <div 
                       className={`h-full rounded-full transition-all duration-500 ${
-                        isCelula ? 'bg-gradient-to-r from-amber-500 to-yellow-300 shadow-[0_0_8px_#f59e0b]' : 'bg-emerald-400 shadow-[0_0_8px_#10b981]'
+                        isCelula 
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-300 shadow-[0_0_8px_#f59e0b]' 
+                          : emEspera > 0
+                          ? 'bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-[0_0_10px_#f43f5e]'
+                          : 'bg-emerald-400 shadow-[0_0_8px_#10b981]'
                       }`}
-                      style={{ width: `${Math.max(5, percentual)}%` }}
+                      style={{ width: `${Math.max(5, Math.min(100, percentual))}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Inner Box with Registered Students */}
-                <div className={`border border-dashed rounded-2xl p-4 ${isCelula ? 'bg-black/50 border-amber-500/30' : 'bg-black/40 border-emerald-500/30'}`}>
+                <div className={`border border-dashed rounded-2xl p-4 ${
+                  isCelula 
+                    ? 'bg-black/50 border-amber-500/30' 
+                    : emEspera > 0
+                    ? 'bg-black/60 border-rose-500/50'
+                    : 'bg-black/40 border-emerald-500/30'
+                }`}>
                   {countInscritos === 0 ? (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
                       <span className={`text-xs font-black uppercase tracking-widest ${isCelula ? 'text-amber-400/80' : 'text-emerald-400/80'}`}>
@@ -217,35 +238,53 @@ export function ListaInscricaoSection() {
                   ) : (
                     <div className="space-y-3">
                       <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                        <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${isCelula ? 'text-amber-300' : 'text-emerald-400'}`}>
+                        <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${isCelula ? 'text-amber-300' : emEspera > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
                           <Users className="w-3.5 h-3.5" />
                           <span>INSCRITOS CONFIRMADOS ({countInscritos}):</span>
                         </span>
                         <span className={`px-2.5 py-0.5 border rounded-md text-[10px] font-black uppercase ${
-                          isCelula ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                          isCelula 
+                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' 
+                            : emEspera > 0
+                            ? 'bg-rose-500/20 border-rose-500/60 text-rose-300'
+                            : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                         }`}>
-                          {isCelula ? 'PRESENÇA REGISTRADA' : `${vagasRestantes} VAGAS LIVRES`}
+                          {isCelula ? 'PRESENÇA REGISTRADA' : emEspera > 0 ? `⚠️ ${emEspera} EM ESPERA` : `${vagasRestantes} VAGAS LIVRES`}
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                        {inscritosUnicos.map((nome, idx) => (
-                          <div 
-                            key={idx}
-                            className={`p-2 rounded-xl border font-extrabold text-xs uppercase flex items-center gap-2 ${
-                              isCelula
-                                ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
-                                : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
-                            }`}
-                          >
-                            <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-mono shrink-0 ${
-                              isCelula ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
-                            }`}>
-                              {idx + 1}
-                            </span>
-                            <span className="truncate">{nome}</span>
-                          </div>
-                        ))}
+                        {inscritosUnicos.map((nome, idx) => {
+                          const excedeVagas = !isCelula && idx >= vagasTotais;
+                          return (
+                            <div 
+                              key={idx}
+                              className={`p-2 rounded-xl border font-extrabold text-xs uppercase flex items-center gap-2 ${
+                                isCelula
+                                  ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                                  : excedeVagas
+                                  ? 'bg-rose-950/80 border-rose-500/80 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse'
+                                  : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
+                              }`}
+                            >
+                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-mono shrink-0 ${
+                                isCelula 
+                                  ? 'bg-amber-500/20 border-amber-400 text-amber-300' 
+                                  : excedeVagas
+                                  ? 'bg-rose-500/30 border-rose-400 text-rose-200'
+                                  : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                              }`}>
+                                {idx + 1}
+                              </span>
+                              <span className="truncate flex-1">{nome}</span>
+                              {excedeVagas && (
+                                <span className="text-[9px] font-black uppercase text-rose-300 bg-rose-500/30 px-1.5 py-0.5 rounded border border-rose-400/60 shrink-0">
+                                  ⏳ ESPERA
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   )}

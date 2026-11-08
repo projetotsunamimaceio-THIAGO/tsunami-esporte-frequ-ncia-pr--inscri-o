@@ -156,6 +156,7 @@ export function ListaInscricoesWidget() {
             const inscritos = getInscritosPorAtividade(act.titulo, isCelula);
             const qtdInscritos = inscritos.length;
             const vagasRestantes = isCelula ? Math.max(0, 100 - qtdInscritos) : Math.max(0, vagasTotais - qtdInscritos);
+            const emEspera = !isCelula && qtdInscritos > vagasTotais ? (qtdInscritos - vagasTotais) : 0;
             const porcentagem = isCelula ? Math.min(100, Math.round((qtdInscritos / 100) * 100)) : Math.min(100, Math.round((qtdInscritos / vagasTotais) * 100));
 
             return (
@@ -164,10 +165,12 @@ export function ListaInscricoesWidget() {
                 className={`border rounded-2xl p-5 transition shadow-lg space-y-4 ${
                   isCelula
                     ? 'bg-[#120e06] border-amber-500/60 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                    : emEspera > 0
+                    ? 'bg-[#1a0810] border-rose-500/80 hover:border-rose-400 shadow-[0_0_25px_rgba(244,63,94,0.2)]'
                     : 'bg-[#080e1c] border-emerald-500/40 hover:border-emerald-400/80'
                 }`}
               >
-                {/* Top Row: Title, Badge, Time & Sortear Linhas Button */}
+                {/* Top Row: Title, Badge, Time & Action Button */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
                     {isCelula && (
@@ -183,6 +186,10 @@ export function ListaInscricoesWidget() {
                       <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/80 text-amber-300 font-black text-[10px] uppercase">
                         PRESENÇA OBRIGATÓRIA
                       </span>
+                    ) : emEspera > 0 ? (
+                      <span className="px-2.5 py-0.5 rounded-md bg-rose-500/30 border border-rose-400 text-rose-300 font-black text-[10px] uppercase animate-pulse">
+                        ⚠️ {emEspera} NA LISTA DE ESPERA
+                      </span>
                     ) : (
                       <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 font-extrabold text-[10px] uppercase">
                         {vagasTotais} VAGAS
@@ -190,7 +197,7 @@ export function ListaInscricoesWidget() {
                     )}
 
                     <span className="text-xs font-mono text-gray-400 flex items-center gap-1 font-bold">
-                      <Clock className={`w-3.5 h-3.5 ${isCelula ? 'text-amber-400' : 'text-emerald-400'}`} />
+                      <Clock className={`w-3.5 h-3.5 ${isCelula ? 'text-amber-400' : emEspera > 0 ? 'text-rose-400' : 'text-emerald-400'}`} />
                       {act.hora || (isCelula ? '19:45' : '20:00')}
                     </span>
                   </div>
@@ -213,11 +220,15 @@ export function ListaInscricoesWidget() {
                 {/* Progress Bar & Vacancies Status */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
-                    <span className={`font-black ${isCelula ? 'text-amber-400' : 'text-emerald-400'}`}>
-                      {isCelula ? `${qtdInscritos} CONFIRMADOS NA CÉLULA` : `${vagasRestantes} VAGAS RESTANTES`}
+                    <span className={`font-black ${isCelula ? 'text-amber-400' : emEspera > 0 ? 'text-rose-400 font-black' : 'text-emerald-400'}`}>
+                      {isCelula 
+                        ? `${qtdInscritos} CONFIRMADOS NA CÉLULA` 
+                        : emEspera > 0 
+                        ? `⚠️ VAGAS PREENCHIDAS (${vagasTotais}/${vagasTotais}) • ${emEspera} NA LISTA DE ESPERA`
+                        : `${vagasRestantes} VAGAS RESTANTES`}
                     </span>
                     <span className="text-gray-400 font-mono">
-                      {qtdInscritos} CONFIRMAÇÕES
+                      {qtdInscritos} / {vagasTotais} INSCRITOS
                     </span>
                   </div>
 
@@ -226,17 +237,21 @@ export function ListaInscricoesWidget() {
                       className={`h-full transition-all duration-500 ${
                         isCelula 
                           ? 'bg-gradient-to-r from-amber-500 to-yellow-300 shadow-[0_0_8px_#f59e0b]' 
+                          : emEspera > 0
+                          ? 'bg-gradient-to-r from-emerald-500 via-amber-400 to-rose-500 shadow-[0_0_10px_#f43f5e]'
                           : 'bg-gradient-to-r from-emerald-500 to-emerald-300 shadow-[0_0_8px_#10b981]'
                       }`}
-                      style={{ width: `${Math.max(5, porcentagem)}%` }}
+                      style={{ width: `${Math.max(5, Math.min(100, porcentagem))}%` }}
                     />
                   </div>
                 </div>
 
-                {/* Inner Enrolled Students Box matching image 2 */}
+                {/* Inner Enrolled Students Box */}
                 <div className={`border border-dashed rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                   isCelula 
                     ? 'bg-black/50 border-amber-500/40' 
+                    : emEspera > 0
+                    ? 'bg-black/60 border-rose-500/50'
                     : 'bg-[#030710] border-emerald-500/30'
                 }`}>
                   {qtdInscritos === 0 ? (
@@ -244,20 +259,30 @@ export function ListaInscricoesWidget() {
                       NENHUM ALUNO CONFIRMADO AINDA
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 max-h-28 overflow-y-auto">
-                      {inscritos.map((aluno, i) => (
-                        <span 
-                          key={i}
-                          className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] uppercase flex items-center gap-1.5 ${
-                            isCelula
-                              ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
-                              : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
-                          }`}
-                        >
-                          <span className={`w-1.5 h-1.5 rounded-full ${isCelula ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
-                          {aluno.nome}
-                        </span>
-                      ))}
+                    <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
+                      {inscritos.map((aluno, i) => {
+                        const excedeVagas = !isCelula && i >= vagasTotais;
+                        return (
+                          <span 
+                            key={i}
+                            className={`px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 ${
+                              isCelula
+                                ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
+                                : excedeVagas
+                                ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse'
+                                : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
+                            }`}
+                          >
+                            <span className={`w-1.5 h-1.5 rounded-full ${isCelula ? 'bg-amber-400' : excedeVagas ? 'bg-rose-400' : 'bg-emerald-400'}`}></span>
+                            <span>{aluno.nome}</span>
+                            {excedeVagas && (
+                              <span className="text-[9px] font-black uppercase text-rose-300 bg-rose-500/30 px-1.5 py-0.5 rounded border border-rose-400/60 ml-1">
+                                ⏳ LISTA DE ESPERA
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })}
                     </div>
                   )}
 
@@ -265,9 +290,15 @@ export function ListaInscricoesWidget() {
                     <span className={`px-3 py-1 font-extrabold text-xs uppercase rounded-lg inline-block border ${
                       isCelula
                         ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                        : emEspera > 0
+                        ? 'bg-rose-500/20 border-rose-500/60 text-rose-300'
                         : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                     }`}>
-                      {isCelula ? `${qtdInscritos} ALUNOS NA CÉLULA` : `${vagasRestantes} VAGAS LIVRES`}
+                      {isCelula 
+                        ? `${qtdInscritos} ALUNOS NA CÉLULA` 
+                        : emEspera > 0
+                        ? `⚠️ ${emEspera} EM ESPERA`
+                        : `${vagasRestantes} VAGAS LIVRES`}
                     </span>
                   </div>
                 </div>
