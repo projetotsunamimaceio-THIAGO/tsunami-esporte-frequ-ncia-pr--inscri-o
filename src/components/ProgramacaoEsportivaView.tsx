@@ -261,9 +261,37 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     await saveFirestorePermissaoEsporte(atualizada);
   };
 
-  // Ações em Lote (Batch)
+  // Helper para converter data DD/MM/YYYY ou ISO para formato comparável YYYY-MM-DD
+  const getISOString = (val?: string): string => {
+    if (!val) return '';
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return val;
+  };
+
+  // Filtragem de apenas alunos matriculados e ativos no período corrente
+  const hojeISO = new Date().toISOString().split('T')[0];
+
+  const ativoNoPeriodo = (aluno: Aluno): boolean => {
+    if (!aluno.matricula_rematricula || !aluno.data_vencimento) return true;
+    const start = getISOString(aluno.matricula_rematricula);
+    const end = getISOString(aluno.data_vencimento);
+    if (!start || !end) return true;
+    return hojeISO >= start && hojeISO <= end;
+  };
+
+  const alunosMatriculadosNoPeriodo = alunos.filter(aluno => ativoNoPeriodo(aluno));
+
+  // Ações em Lote (Batch) operando apenas em alunos matriculados no período
   const handleLiberarTodos = async () => {
-    const atualizados = alunos.map(aluno => {
+    const atualizados = alunosMatriculadosNoPeriodo.map(aluno => {
       const p = getPermissaoAluno(aluno);
       return { ...p, liberado: true };
     });
@@ -271,7 +299,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   };
 
   const handleBloquearTodos = async () => {
-    const atualizados = alunos.map(aluno => {
+    const atualizados = alunosMatriculadosNoPeriodo.map(aluno => {
       const p = getPermissaoAluno(aluno);
       return { ...p, liberado: false };
     });
@@ -279,7 +307,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   };
 
   const handleBloquearJustificarTodos = async () => {
-    const atualizados = alunos.map(aluno => {
+    const atualizados = alunosMatriculadosNoPeriodo.map(aluno => {
       const p = getPermissaoAluno(aluno);
       return { ...p, liberadoJustificativa: false };
     });
@@ -299,8 +327,8 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     }
   };
 
-  // Lista de alunos filtrada
-  const alunosFiltrados = alunos.filter(aluno => {
+  // Lista de alunos matriculados no período filtrada
+  const alunosFiltrados = alunosMatriculadosNoPeriodo.filter(aluno => {
     const perm = getPermissaoAluno(aluno);
     const matchNome = aluno.nome.toLowerCase().includes(buscaAluno.toLowerCase()) ||
                       (aluno.turma || '').toLowerCase().includes(buscaAluno.toLowerCase());
@@ -316,10 +344,10 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     return true;
   });
 
-  // Contagens para os Filtros Tab
-  const countTodos = alunos.length;
-  const countLiberadosJustificar = alunos.filter(a => getPermissaoAluno(a).liberadoJustificativa).length;
-  const countSemAutorizacao = alunos.filter(a => !getPermissaoAluno(a).liberado).length;
+  // Contagens para os Filtros Tab (apenas alunos matriculados no período)
+  const countTodos = alunosMatriculadosNoPeriodo.length;
+  const countLiberadosJustificar = alunosMatriculadosNoPeriodo.filter(a => getPermissaoAluno(a).liberadoJustificativa).length;
+  const countSemAutorizacao = alunosMatriculadosNoPeriodo.filter(a => !getPermissaoAluno(a).liberado).length;
 
   return (
     <div className="min-h-screen w-full bg-[#07080f] text-white font-rajdhani p-4 md:p-8 relative">

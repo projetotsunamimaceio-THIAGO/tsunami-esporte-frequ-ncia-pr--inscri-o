@@ -16,7 +16,9 @@ import {
   RefreshCw, 
   Trash2, 
   Calendar,
-  Sparkles
+  Sparkles,
+  Camera,
+  CameraOff
 } from 'lucide-react';
 
 interface ArenaFacialViewProps {
@@ -65,6 +67,7 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
 
   // Camera & Scan Animation State
   const [cameraActive, setCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const [scanning, setScanning] = useState(false);
   const [hudPercent, setHudPercent] = useState(0);
   const [hudText, setHudText] = useState('Detectando rosto...');
@@ -107,6 +110,9 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       localStorage.setItem('tsunami_ordens', JSON.stringify(oMap));
     });
 
+    // Auto-start camera when mounting view
+    ligarCamera();
+
     return () => {
       desligarCamera();
       unsubAlunos();
@@ -119,16 +125,33 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
 
   const ligarCamera = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
-      });
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setCameraError('Seu navegador não possui suporte para acesso direto à câmera.');
+        return false;
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
+        });
+      } catch (firstErr) {
+        // Fallback constraint if facingMode is not supported on desktop webcams
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
       streamRef.current = stream;
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
       }
       setCameraActive(true);
+      setCameraError(null);
       return true;
-    } catch (err) {
+    } catch (err: any) {
+      console.warn('Câmera indisponível ou permissão negada:', err);
+      setCameraError('Permissão para câmera não concedida no navegador.');
+      setCameraActive(false);
       return false;
     }
   };
@@ -359,21 +382,63 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
 
         {/* Camera HUD Box with Realistic Biometric Mesh Overlay */}
         <div className="bg-white/5 backdrop-blur-md border border-emerald-500/30 p-4 rounded-2xl mb-4 text-center">
-          <div className="flex justify-between items-center mb-2 px-1">
+          <div className="flex justify-between items-center mb-3 px-1">
             <p className="text-[11px] uppercase text-emerald-400 font-bold tracking-widest flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{cameraActive ? 'Reconhecimento Biométrico Ativo' : 'Câmera Aguardando Chamada...'}</span>
+              <span>{cameraActive ? 'Reconhecimento Biométrico Ativo' : 'Câmera Desligada / Aguardando...'}</span>
             </p>
-            {scanning && (
-              <span className="text-xs font-mono text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded font-bold animate-pulse">
-                {hudPercent}%
-              </span>
-            )}
+
+            <div className="flex items-center gap-2">
+              {scanning && (
+                <span className="text-xs font-mono text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded font-bold animate-pulse">
+                  {hudPercent}%
+                </span>
+              )}
+
+              {cameraActive ? (
+                <button
+                  onClick={desligarCamera}
+                  className="px-2.5 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white rounded-lg text-[10px] font-bold uppercase transition flex items-center gap-1 cursor-pointer"
+                >
+                  <CameraOff className="w-3.5 h-3.5" />
+                  <span>Desligar</span>
+                </button>
+              ) : (
+                <button
+                  onClick={ligarCamera}
+                  className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-400 text-emerald-300 hover:bg-emerald-500 hover:text-black rounded-lg text-[10px] font-bold uppercase transition flex items-center gap-1 cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.3)]"
+                >
+                  <Camera className="w-3.5 h-3.5" />
+                  <span>Ativar Câmera</span>
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="relative w-full max-w-[320px] h-[240px] rounded-2xl border-2 border-emerald-500/80 overflow-hidden mx-auto bg-black flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-            <video ref={videoRef} autoPlay muted playsInline className="w-full h-full object-cover -scale-x-100" />
+            <video 
+              ref={videoRef} 
+              autoPlay 
+              muted 
+              playsInline 
+              className={`w-full h-full object-cover -scale-x-100 ${cameraActive ? 'block' : 'hidden'}`} 
+            />
             
+            {!cameraActive && (
+              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
+                <CameraOff className="w-10 h-10 text-emerald-500/50" />
+                <p className="text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
+                  Câmera em espera
+                </p>
+                <button
+                  onClick={ligarCamera}
+                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase rounded-xl transition cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                >
+                  Abra a Câmera Aqui
+                </button>
+              </div>
+            )}
+
             {/* Corner Reticle Brackets matching reference screenshot */}
             <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
             <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
@@ -436,10 +501,17 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
             )}
           </div>
 
-          <div className="mt-3 flex justify-center gap-4 text-[10px] font-bold">
+          {cameraError && (
+            <div className="mt-2 text-rose-400 text-xs font-bold uppercase flex items-center justify-center gap-1">
+              <AlertTriangle className="w-3.5 h-3.5" />
+              <span>{cameraError}</span>
+            </div>
+          )}
+
+          <div className="mt-3 flex justify-center items-center gap-4 text-[10px] font-bold">
             <span className="text-emerald-400 flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              SISTEMA PRONTO
+              <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
+              {cameraActive ? 'CÂMERA ONLINE' : 'CÂMERA OFFLINE'}
             </span>
             <span className="text-gray-400">{comFotoCount} rostos cadastrados (Ativos)</span>
           </div>
