@@ -5,9 +5,10 @@ import { ListaInscricoesWidget } from './ListaInscricoesWidget';
 interface HomeViewProps {
   onOpenAdmin: () => void;
   onOpenEsporte: () => void;
+  onOpenRelatorioPontuacao: () => void;
 }
 
-export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
+export function HomeView({ onOpenAdmin, onOpenEsporte, onOpenRelatorioPontuacao }: HomeViewProps) {
   return (
     <div className="relative min-h-screen w-full circuit-bg text-white font-rajdhani flex flex-col justify-between items-center p-4 md:p-8 select-none overflow-hidden">
       
@@ -43,7 +44,7 @@ export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
       <main className="relative z-10 my-auto flex flex-col items-center justify-center w-full max-w-5xl px-4 py-8">
         
         {/* Brand Header Lockup */}
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-10 mb-14 md:mb-20">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-6 md:gap-10 mb-10 md:mb-14">
           
           {/* Logo Badge Container (FULLY ROUND WITH REAL LOGO IMAGE) */}
           <div className="w-40 h-40 sm:w-44 sm:h-44 md:w-52 md:h-52 rounded-full bg-[#030914] border-2 border-cyan-400 p-1.5 shadow-[0_0_30px_rgba(0,229,255,0.45)] flex items-center justify-center relative shrink-0 overflow-hidden">
@@ -70,13 +71,13 @@ export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
 
             {/* Subtitle */}
             <p className="text-lg sm:text-xl md:text-2xl text-gray-200 font-rajdhani font-medium tracking-normal">
-              Educação, esporte e disciplina
+              Evangelização, esporte e disciplina
             </p>
           </div>
         </div>
 
         {/* Action Buttons Section with Horizontal Connector */}
-        <div className="relative w-full max-w-4xl flex flex-col sm:flex-row items-stretch justify-center gap-6 sm:gap-16 my-4">
+        <div className="relative w-full max-w-4xl flex flex-col sm:flex-row items-stretch justify-center gap-6 sm:gap-16 mt-2 mb-6">
           
           {/* Connecting Line between Buttons */}
           <div className="hidden sm:block absolute top-1/2 left-1/4 right-1/4 h-[2px] bg-cyan-400/50 -translate-y-1/2 z-0 shadow-[0_0_10px_rgba(6,182,212,0.8)]"></div>
@@ -124,7 +125,21 @@ export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
 
         </div>
 
-        {/* LISTA DE INSCRIÇÃO Section right below the two main buttons */}
+        {/* Button 3: RELATÓRIO DE PONTUAÇÃO (Centered directly below the two main buttons) */}
+        <div className="w-full max-w-2xl mb-8 z-10">
+          <button
+            onClick={onOpenRelatorioPontuacao}
+            aria-label="Relatório de Pontuação"
+            className="w-full relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#170a2c]/90 via-[#260e3d]/90 to-[#170a2c]/90 border-2 border-yellow-400 hover:border-yellow-300 p-4 sm:p-5 text-center shadow-[0_0_30px_rgba(234,179,8,0.35)] hover:shadow-[0_0_40px_rgba(234,179,8,0.6)] flex items-center justify-center gap-3 transition-all duration-300 cursor-pointer active:scale-95 group"
+          >
+            <Trophy className="w-6 h-6 text-yellow-400 group-hover:scale-110 transition-transform shrink-0" />
+            <span className="text-lg sm:text-2xl font-black tracking-widest text-yellow-300 group-hover:text-yellow-200 uppercase font-chakra">
+              RELATÓRIO DE PONTUAÇÃO 🏆
+            </span>
+          </button>
+        </div>
+
+        {/* LISTA DE INSCRIÇÃO Section right below */}
         <ListaInscricoesWidget />
 
       </main>
@@ -132,7 +147,7 @@ export function HomeView({ onOpenAdmin, onOpenEsporte }: HomeViewProps) {
       {/* Footer Section */}
       <footer className="relative z-10 w-full text-center py-4 text-gray-300 font-rajdhani font-medium tracking-widest uppercase text-sm sm:text-base space-y-1">
         <p className="text-gray-200">
-          PROJETO TSUNAMI @2027 - EDUCAÇÃO, ESPORTE E DISCIPLINA
+          PROJETO TSUNAMI @2027 - EVANGELIZAÇÃO, ESPORTE E DISCIPLINA
         </p>
         <p className="text-gray-400 text-xs sm:text-sm">
           ARENA SEDE - SARA NOSSA TERRA - MACEIÓ - AL

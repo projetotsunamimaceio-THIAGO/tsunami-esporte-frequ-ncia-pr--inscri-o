@@ -565,14 +565,29 @@ export async function clearAllFirestoreInscricoesEsporte(): Promise<void> {
   }
 }
 
-// ==========================================
-// CONFIGURAÇÃO GLOBAL ESPORTE (TRANCAR / LIBERAR INSCRIÇÕES)
-// ==========================================
-export async function saveFirestoreConfiguracaoEsporte(trancado: boolean): Promise<void> {
+export interface ConfiguracaoEsporte {
+  trancado: boolean;
+  justificativasTrancadas: boolean;
+}
+
+export async function saveFirestoreConfiguracaoEsporte(
+  trancadoInscricoes: boolean, 
+  trancadoJustificativas?: boolean
+): Promise<void> {
   const path = 'configuracoes_esporte';
   try {
-    await setDoc(doc(db, path, 'status_geral'), {
-      trancado: !!trancado,
+    const docRef = doc(db, path, 'status_geral');
+    const existing = await getDoc(docRef);
+    let justVal = false;
+    if (existing.exists()) {
+      justVal = !!existing.data().justificativasTrancadas;
+    }
+    if (trancadoJustificativas !== undefined) {
+      justVal = trancadoJustificativas;
+    }
+    await setDoc(docRef, {
+      trancado: !!trancadoInscricoes,
+      justificativasTrancadas: !!justVal,
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -580,13 +595,17 @@ export async function saveFirestoreConfiguracaoEsporte(trancado: boolean): Promi
   }
 }
 
-export function subscribeFirestoreConfiguracaoEsporte(onUpdate: (trancado: boolean) => void) {
+export function subscribeFirestoreConfiguracaoEsporte(onUpdate: (config: ConfiguracaoEsporte) => void) {
   const path = 'configuracoes_esporte';
   return onSnapshot(doc(db, path, 'status_geral'), (snap) => {
     if (snap.exists()) {
-      onUpdate(!!snap.data().trancado);
+      const d = snap.data();
+      onUpdate({
+        trancado: !!d.trancado,
+        justificativasTrancadas: !!d.justificativasTrancadas
+      });
     } else {
-      onUpdate(false);
+      onUpdate({ trancado: false, justificativasTrancadas: false });
     }
   }, (error) => {
     handleFirestoreError(error, OperationType.GET, path);

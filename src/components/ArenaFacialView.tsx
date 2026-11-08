@@ -13,12 +13,13 @@ import {
   CheckCircle, 
   Clock, 
   AlertTriangle, 
-  RefreshCw, 
   Trash2, 
   Calendar,
   Sparkles,
   Camera,
-  CameraOff
+  CameraOff,
+  X,
+  UserCheck
 } from 'lucide-react';
 
 interface ArenaFacialViewProps {
@@ -77,21 +78,13 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
     return false;
   };
 
-  // Camera & Scan Animation State
+  // Camera & Selected Student State
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [scanning, setScanning] = useState(false);
-  const [hudPercent, setHudPercent] = useState(0);
-  const [hudText, setHudText] = useState('Detectando rosto...');
-  const [processingIdx, setProcessingIdx] = useState<number | null>(null);
-
-  // Result Overlay
-  const [resultOverlay, setResultOverlay] = useState<{
-    open: boolean;
-    aluno?: Aluno;
-    hora?: string;
-    syncState: 'syncing' | 'ok' | 'error';
-  }>({ open: false, syncState: 'syncing' });
+  const [modalAluno, setModalAluno] = useState<Aluno | null>(null);
+  const [capturando, setCapturando] = useState<boolean>(false);
+  const [flashEffect, setFlashEffect] = useState<boolean>(false);
+  const [confirmSucesso, setConfirmSucesso] = useState<{ hora: string } | null>(null);
 
   // Long press correction modal
   const [correcaoIdx, setCorrecaoIdx] = useState<number | null>(null);
@@ -122,9 +115,6 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       localStorage.setItem('tsunami_ordens', JSON.stringify(oMap));
     });
 
-    // Auto-start camera when mounting view
-    ligarCamera();
-
     return () => {
       desligarCamera();
       unsubAlunos();
@@ -132,6 +122,14 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       unsubFreq();
     };
   }, []);
+
+  // Re-attach video stream when modal opens
+  useEffect(() => {
+    if (modalAluno && streamRef.current && videoRef.current) {
+      videoRef.current.srcObject = streamRef.current;
+      videoRef.current.play().catch(() => {});
+    }
+  }, [modalAluno]);
 
   const chave = (nome: string, dataISO: string) => (nome.trim().toUpperCase() + '|' + dataISO);
 
@@ -142,13 +140,22 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
         return false;
       }
 
+      if (streamRef.current) {
+        setCameraActive(true);
+        setCameraError(null);
+        if (videoRef.current) {
+          videoRef.current.srcObject = streamRef.current;
+          videoRef.current.play().catch(() => {});
+        }
+        return true;
+      }
+
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' }
         });
       } catch (firstErr) {
-        // Fallback constraint if facingMode is not supported on desktop webcams
         stream = await navigator.mediaDevices.getUserMedia({ video: true });
       }
 
@@ -176,7 +183,6 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
     setCameraActive(false);
   };
 
-  // Helper audio beep on biometric match
   const playBeepSound = () => {
     try {
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
@@ -185,7 +191,7 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(880, ctx.currentTime); // A5
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
       gain.gain.setValueAtTime(0.1, ctx.currentTime);
       osc.connect(gain);
       gain.connect(ctx.destination);
@@ -194,96 +200,82 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
     } catch (e) {}
   };
 
-  const iniciarProcesso = async (idx: number) => {
-    const aluno = listaFiltrada[idx];
-    if (!aluno) return;
+  // Start confirmation process for selected student
+  const iniciarConfirmacao = async (aluno: Aluno) => {
     const k = chave(aluno.nome, dataAula);
+    setModalAluno(aluno);
 
     if (freq[k] === 'P' || freq[k] === 'A') {
-      // Already marked, show result modal with current info
-      setResultOverlay({
-        open: true,
-        aluno,
-        hora: ordens[k] || new Date().toLocaleTimeString('pt-BR'),
-        syncState: 'ok'
-      });
-      return;
+      setConfirmSucesso({ hora: ordens[k] || new Date().toLocaleTimeString('pt-BR') });
+    } else {
+      setConfirmSucesso(null);
     }
 
-    setProcessingIdx(idx);
+    setCapturando(false);
+    await ligarCamera();
+  };
 
+  // Confirm presence and trigger camera capture
+  const handleConfirmarPresencaComFoto = async () => {
+    if (!modalAluno) return;
+    setCapturando(true);
+
+    // 1. Shutter Flash Effect
+    setFlashEffect(true);
+    setTimeout(() => setFlashEffect(false), 250);
+
+    // 2. Temporary snapshot in memory (immediately discarded/deleted)
+    try {
+      if (videoRef.current) {
+        const canvas = document.createElement('canvas');
+        canvas.width = videoRef.current.videoWidth || 640;
+        canvas.height = videoRef.current.videoHeight || 480;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+        }
+        // Discard image memory immediately
+        canvas.width = 0;
+        canvas.height = 0;
+      }
+    } catch (e) {
+      console.warn('Captura temporária:', e);
+    }
+
+    // 3. Current timestamp
     const agora = new Date();
     const hStr = agora.getHours().toString().padStart(2, '0') + ':' +
       agora.getMinutes().toString().padStart(2, '0') + ':' +
       agora.getSeconds().toString().padStart(2, '0');
 
-    // 1. Turn on camera and show biometric HUD
-    await ligarCamera();
-    setScanning(true);
+    // 4. Audio beep and vibration
+    if (navigator.vibrate) navigator.vibrate([60, 40, 60]);
+    playBeepSound();
 
-    const frases = [
-      'Detectando e centralizando rosto...',
-      'Mapeando 68 pontos biométricos...',
-      'Analisando malha e distância ocular...',
-      'Comparando vetor biométrico com cadastro...',
-      'Biometria Confirmada (Match 98.7%)!'
-    ];
-
-    const startTime = Date.now();
-    const duration = 4500; // 4.5 seconds scan animation duration as requested
-
-    await new Promise<void>((resolve) => {
-      const interval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(1, elapsed / duration);
-        const percent = Math.min(98.7, Math.floor(progress * 100 * 0.987));
-        
-        setHudPercent(Number(percent.toFixed(1)));
-
-        const phraseIdx = Math.min(
-          frases.length - 1,
-          Math.floor(progress * (frases.length - 1))
-        );
-        setHudText(frases[phraseIdx]);
-
-        if (elapsed >= duration) {
-          clearInterval(interval);
-          setHudPercent(98.7);
-          setHudText('Biometria Confirmada (Match 98.7%)!');
-          if (navigator.vibrate) navigator.vibrate([50, 30, 50]);
-          playBeepSound();
-          resolve();
-        }
-      }, 70);
-    });
-
-    await new Promise(r => setTimeout(r, 400));
-    setScanning(false);
-
-    // 2. Show Result Overlay & sync with Firestore
-    setResultOverlay({
-      open: true,
-      aluno,
-      hora: hStr,
-      syncState: 'syncing'
-    });
-
-    setProcessingIdx(null);
-
-    // 3. Save presence to Firestore
-    sincronizarPresenca(aluno.nome, dataAula, 'P', hStr);
-  };
-
-  const sincronizarPresenca = async (nome: string, dataISO: string, statusText: string, hora: string) => {
+    // 5. Save presence in Firestore
     try {
-      await saveFirestoreFrequencia(nome, dataISO, statusText, '', hora);
-      setResultOverlay(prev => ({ ...prev, syncState: 'ok' }));
+      await saveFirestoreFrequencia(modalAluno.nome, dataAula, 'P', '', hStr);
     } catch (e) {
-      setResultOverlay(prev => ({ ...prev, syncState: 'error' }));
+      console.error('Erro ao salvar presença:', e);
     }
+
+    setConfirmSucesso({ hora: hStr });
+    setCapturando(false);
+
+    // 6. Close camera modal after brief success feedback
+    setTimeout(() => {
+      fecharModalCamera();
+    }, 1300);
   };
 
-  // Long Press handlers
+  const fecharModalCamera = () => {
+    setModalAluno(null);
+    setConfirmSucesso(null);
+    setCapturando(false);
+    desligarCamera();
+  };
+
+  // Long Press handlers for manual status correction
   const handleTouchStart = (idx: number) => {
     pressTimerRef.current = setTimeout(() => {
       setCorrecaoIdx(idx);
@@ -308,7 +300,9 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       } catch (e) {}
     } else {
       const hStr = new Date().toLocaleTimeString('pt-BR');
-      sincronizarPresenca(aluno.nome, dataAula, novoStatus, hStr);
+      try {
+        await saveFirestoreFrequencia(aluno.nome, dataAula, novoStatus, '', hStr);
+      } catch (e) {}
     }
 
     setCorrecaoIdx(null);
@@ -336,8 +330,6 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
     .filter(a => ativo(a, dataAula))
     .filter(a => !filtroTurma || a.turma === filtroTurma)
     .sort((a, b) => a.nome.localeCompare(b.nome));
-
-  const comFotoCount = listaFiltrada.filter(a => a.face_data && a.face_data.length > 100).length;
 
   const dataBR = dataAula.split('-').reverse().join('/');
 
@@ -388,145 +380,8 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
         <div className="bg-white/5 border border-emerald-500/30 rounded-xl p-3 text-center mb-4">
           <p className="text-xs text-emerald-400 uppercase font-semibold flex items-center justify-center gap-1">
             <Fingerprint className="w-4 h-4" />
-            <span>Toque no aluno matriculado para iniciar leitura biométrica ({dataBR})</span>
+            <span>Clique no nome do aluno para abrir a câmera e confirmar presença ({dataBR})</span>
           </p>
-        </div>
-
-        {/* Camera HUD Box with Realistic Biometric Mesh Overlay */}
-        <div className="bg-white/5 backdrop-blur-md border border-emerald-500/30 p-4 rounded-2xl mb-4 text-center">
-          <div className="flex justify-between items-center mb-3 px-1">
-            <p className="text-[11px] uppercase text-emerald-400 font-bold tracking-widest flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>{cameraActive ? 'Reconhecimento Biométrico Ativo' : 'Câmera Desligada / Aguardando...'}</span>
-            </p>
-
-            <div className="flex items-center gap-2">
-              {scanning && (
-                <span className="text-xs font-mono text-emerald-300 bg-emerald-500/20 border border-emerald-500/40 px-2 py-0.5 rounded font-bold animate-pulse">
-                  {hudPercent}%
-                </span>
-              )}
-
-              {cameraActive ? (
-                <button
-                  onClick={desligarCamera}
-                  className="px-2.5 py-1 bg-rose-500/20 border border-rose-500/40 text-rose-300 hover:bg-rose-500 hover:text-white rounded-lg text-[10px] font-bold uppercase transition flex items-center gap-1 cursor-pointer"
-                >
-                  <CameraOff className="w-3.5 h-3.5" />
-                  <span>Desligar</span>
-                </button>
-              ) : (
-                <button
-                  onClick={ligarCamera}
-                  className="px-2.5 py-1 bg-emerald-500/20 border border-emerald-400 text-emerald-300 hover:bg-emerald-500 hover:text-black rounded-lg text-[10px] font-bold uppercase transition flex items-center gap-1 cursor-pointer shadow-[0_0_10px_rgba(16,185,129,0.3)]"
-                >
-                  <Camera className="w-3.5 h-3.5" />
-                  <span>Ativar Câmera</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          <div className="relative w-full max-w-[320px] h-[240px] rounded-2xl border-2 border-emerald-500/80 overflow-hidden mx-auto bg-black flex items-center justify-center shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-            <video 
-              ref={videoRef} 
-              autoPlay 
-              muted 
-              playsInline 
-              className={`w-full h-full object-cover -scale-x-100 ${cameraActive ? 'block' : 'hidden'}`} 
-            />
-            
-            {!cameraActive && (
-              <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
-                <CameraOff className="w-10 h-10 text-emerald-500/50" />
-                <p className="text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
-                  Câmera em espera
-                </p>
-                <button
-                  onClick={ligarCamera}
-                  className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase rounded-xl transition cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.4)]"
-                >
-                  Abra a Câmera Aqui
-                </button>
-              </div>
-            )}
-
-            {/* Corner Reticle Brackets matching reference screenshot */}
-            <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-            <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-            <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-            <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-
-            {/* Center Target Crosshair */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
-              <div className="w-16 h-16 border border-emerald-400/50 rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-              </div>
-            </div>
-
-            {/* SVG Facial Landmark Mesh Graph */}
-            <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-85 z-10" viewBox="0 0 320 240">
-              <g stroke="#10b981" strokeWidth="0.9" opacity="0.75" className={scanning ? "animate-pulse" : ""}>
-                <line x1="120" y1="80" x2="160" y2="110"/>
-                <line x1="200" y1="80" x2="160" y2="110"/>
-                <line x1="160" y1="110" x2="140" y2="140"/>
-                <line x1="160" y1="110" x2="180" y2="140"/>
-                <line x1="140" y1="140" x2="115" y2="170"/>
-                <line x1="180" y1="140" x2="205" y2="170"/>
-                <line x1="140" y1="140" x2="180" y2="140"/>
-                <line x1="115" y1="170" x2="160" y2="165"/>
-                <line x1="205" y1="170" x2="160" y2="165"/>
-                <line x1="100" y1="70" x2="120" y2="80"/>
-                <line x1="220" y1="70" x2="200" y2="80"/>
-                <line x1="160" y1="60" x2="120" y2="80"/>
-                <line x1="160" y1="60" x2="200" y2="80"/>
-                <line x1="85" y1="115" x2="100" y2="70"/>
-                <line x1="235" y1="115" x2="220" y2="70"/>
-                <line x1="120" y1="80" x2="200" y2="80"/>
-                <line x1="120" y1="80" x2="140" y2="140"/>
-                <line x1="200" y1="80" x2="180" y2="140"/>
-              </g>
-              <g fill="#34d399">
-                <circle cx="120" cy="80" r="3.5" className="animate-ping" style={{ animationDuration: '2s' }} />
-                <circle cx="200" cy="80" r="3.5" className="animate-ping" style={{ animationDuration: '2s' }} />
-                <circle cx="160" cy="110" r="4" className="animate-pulse" />
-                <circle cx="140" cy="140" r="3" />
-                <circle cx="180" cy="140" r="3" />
-                <circle cx="160" cy="165" r="3.5" />
-                <circle cx="115" cy="170" r="3" />
-                <circle cx="205" cy="170" r="3" />
-                <circle cx="160" cy="60" r="3" />
-                <circle cx="100" cy="70" r="3" />
-                <circle cx="220" cy="70" r="3" />
-              </g>
-            </svg>
-
-            {/* Laser scan beam and status bar */}
-            {scanning && (
-              <>
-                <div className="absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-emerald-400 to-transparent shadow-[0_0_15px_#10b981] animate-scan-beam pointer-events-none z-20" />
-                
-                <div className="absolute bottom-2 inset-x-2 text-[11px] uppercase font-bold text-emerald-300 text-center tracking-wider bg-black/80 backdrop-blur-sm py-1.5 px-2 rounded-lg border border-emerald-500/40 z-30 shadow-lg">
-                  {hudText}
-                </div>
-              </>
-            )}
-          </div>
-
-          {cameraError && (
-            <div className="mt-2 text-rose-400 text-xs font-bold uppercase flex items-center justify-center gap-1">
-              <AlertTriangle className="w-3.5 h-3.5" />
-              <span>{cameraError}</span>
-            </div>
-          )}
-
-          <div className="mt-3 flex justify-center items-center gap-4 text-[10px] font-bold">
-            <span className="text-emerald-400 flex items-center gap-1">
-              <span className={`w-2 h-2 rounded-full ${cameraActive ? 'bg-emerald-400 animate-pulse' : 'bg-gray-500'}`} />
-              {cameraActive ? 'CÂMERA ONLINE' : 'CÂMERA OFFLINE'}
-            </span>
-            <span className="text-gray-400">{comFotoCount} rostos cadastrados (Ativos)</span>
-          </div>
         </div>
 
         {/* Turma Filter */}
@@ -534,7 +389,7 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
           <select 
             value={filtroTurma}
             onChange={e => setFiltroTurma(e.target.value)}
-            className="w-full bg-transparent text-emerald-400 text-sm font-bold outline-none cursor-pointer"
+            className="w-full bg-transparent text-emerald-400 text-sm font-bold outline-none cursor-pointer uppercase"
           >
             <option value="">TODAS AS TURMAS</option>
             {turmas.map(t => <option key={t.nome} value={t.nome}>{t.nome}</option>)}
@@ -556,7 +411,6 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                 const k = chave(aluno.nome, dataAula);
                 const status = freq[k] || '';
                 const jaMarcado = status === 'P' || status === 'A';
-                const isProcessing = processingIdx === idx;
                 const temFoto = aluno.face_data && aluno.face_data.length > 100;
 
                 return (
@@ -567,50 +421,39 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                     onMouseLeave={handleTouchEnd}
                     onTouchStart={() => handleTouchStart(idx)}
                     onTouchEnd={handleTouchEnd}
-                    onClick={() => {
-                      if (!isProcessing) {
-                        iniciarProcesso(idx);
-                      }
-                    }}
-                    className={`p-3 rounded-xl border flex items-center gap-3 transition cursor-pointer select-none ${
-                      isProcessing 
-                        ? 'bg-amber-500/20 border-amber-500 text-amber-300' 
-                        : jaMarcado 
-                          ? 'bg-emerald-500/20 border-emerald-500 text-white' 
-                          : 'bg-white/5 border-emerald-500/20 hover:bg-emerald-500/10'
+                    onClick={() => iniciarConfirmacao(aluno)}
+                    className={`p-3.5 rounded-2xl border flex items-center gap-3 transition cursor-pointer select-none ${
+                      jaMarcado 
+                        ? 'bg-emerald-950/40 border-emerald-500/80 text-white shadow-[0_0_15px_rgba(16,185,129,0.15)]' 
+                        : 'bg-white/5 border-emerald-500/20 hover:bg-emerald-500/10 hover:border-emerald-400/60'
                     }`}
                   >
                     {temFoto ? (
                       <img src={aluno.face_data} alt={aluno.nome} className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/50" />
                     ) : (
-                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg font-bold">
-                        {aluno.nome.charAt(0)}
+                      <div className="w-12 h-12 rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 text-lg font-bold shrink-0">
+                        {aluno.nome.charAt(0).toUpperCase()}
                       </div>
                     )}
 
-                    <div className="flex-1">
-                      <h4 className="font-bold text-emerald-300 uppercase text-sm">{aluno.nome}</h4>
-                      <p className="text-[10px] text-gray-400">{aluno.turma || 'Sem turma'}</p>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-extrabold text-emerald-300 uppercase text-sm truncate">{aluno.nome}</h4>
+                      <p className="text-[10px] text-gray-400 truncate">{aluno.turma || 'Sem turma'}</p>
                     </div>
 
-                    <div>
-                      {isProcessing ? (
-                        <span className="text-[10px] text-amber-400 flex items-center gap-1 font-bold">
-                          <Clock className="w-3 h-3 animate-spin" />
-                          <span>Mapeando Biometria...</span>
-                        </span>
-                      ) : jaMarcado ? (
+                    <div className="shrink-0">
+                      {jaMarcado ? (
                         <div className="text-right">
-                          <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-bold">
-                            <CheckCircle className="w-3 h-3" />
+                          <span className="text-[10px] text-emerald-400 flex items-center gap-1 font-black uppercase">
+                            <CheckCircle className="w-3.5 h-3.5" />
                             <span>Presente ({ordens[k] || ''})</span>
                           </span>
-                          <span className="text-[9px] text-gray-400 block">Segure p/ corrigir</span>
+                          <span className="text-[9px] text-gray-400 block mt-0.5">Clique p/ reabrir</span>
                         </div>
                       ) : (
-                        <span className="text-[10px] text-gray-500 flex items-center gap-1">
-                          <Fingerprint className="w-3 h-3" />
-                          <span>Aguardando</span>
+                        <span className="text-[10px] text-emerald-400/80 font-extrabold uppercase px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 flex items-center gap-1">
+                          <Camera className="w-3 h-3 text-emerald-400" />
+                          <span>PRESENÇA</span>
                         </span>
                       )}
                     </div>
@@ -623,70 +466,161 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
 
       </div>
 
-      {/* Result Overlay */}
-      {resultOverlay.open && resultOverlay.aluno && (
-        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in">
-          {resultOverlay.aluno.face_data ? (
-            <img 
-              src={resultOverlay.aluno.face_data} 
-              alt={resultOverlay.aluno.nome} 
-              className="w-48 h-48 rounded-full object-cover border-4 border-emerald-500 shadow-[0_0_40px_rgba(16,185,129,0.6)] mb-4" 
-            />
-          ) : (
-            <div className="w-48 h-48 rounded-full bg-emerald-500/10 border-4 border-emerald-500 flex items-center justify-center text-emerald-400 text-5xl mb-4">
-              <CheckCircle className="w-24 h-24" />
+      {/* CAMERA MODAL CONFIRMAÇÃO DE PRESENÇA */}
+      {modalAluno && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 animate-fade-in overflow-y-auto select-none">
+          <div className="bg-[#080d19] border-2 border-emerald-400 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-[0_0_50px_rgba(16,185,129,0.3)] relative text-center space-y-4">
+            
+            {/* Flash Effect Layer */}
+            {flashEffect && (
+              <div className="absolute inset-0 bg-white z-50 rounded-3xl animate-ping opacity-90 pointer-events-none" />
+            )}
+
+            {/* Header Lockup */}
+            <div className="flex items-center justify-between border-b border-emerald-500/30 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-emerald-300">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <span className="text-xs font-black text-emerald-400 uppercase tracking-widest font-chakra">
+                  RECONHECIMENTO FACIAL ARENA
+                </span>
+              </div>
+
+              <button
+                onClick={fecharModalCamera}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-rose-500/30 text-gray-300 hover:text-white flex items-center justify-center transition cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
             </div>
-          )}
 
-          <h2 className="text-2xl font-bold uppercase text-white mb-1">
-            {resultOverlay.aluno.nome}
-          </h2>
-          <p className="text-emerald-400 text-sm font-bold uppercase tracking-wider flex items-center justify-center gap-1">
-            <CheckCircle className="w-4 h-4" /> Biometria Confirmada
-          </p>
-          <p className="text-xs text-gray-400 mt-2 font-mono">Match Biométrico: 98.7%</p>
-          <p className="text-xs text-emerald-300 mt-1">Presença registrada às {resultOverlay.hora} em {dataBR}</p>
+            {/* Camera Viewfinder Stream */}
+            <div className="relative w-full h-64 bg-black rounded-2xl border-2 border-emerald-500/80 overflow-hidden shadow-[0_0_25px_rgba(16,185,129,0.25)] flex items-center justify-center">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                muted 
+                playsInline 
+                className={`w-full h-full object-cover -scale-x-100 ${cameraActive ? 'block' : 'hidden'}`} 
+              />
 
-          <div className="mt-3 text-xs">
-            {resultOverlay.syncState === 'syncing' && (
-              <span className="text-amber-400 flex items-center justify-center gap-1 font-mono">
-                <RefreshCw className="w-3 h-3 animate-spin" /> Salvando no Firestore...
-              </span>
+              {!cameraActive && (
+                <div className="flex flex-col items-center justify-center p-6 text-center space-y-3 z-20">
+                  <CameraOff className="w-10 h-10 text-emerald-500/50" />
+                  <p className="text-xs text-emerald-400/80 font-bold uppercase tracking-wider">
+                    Câmera em espera
+                  </p>
+                  <button
+                    onClick={ligarCamera}
+                    className="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold text-xs uppercase rounded-xl transition cursor-pointer shadow-[0_0_15px_rgba(16,185,129,0.4)]"
+                  >
+                    ATIVAR CÂMERA
+                  </button>
+                </div>
+              )}
+
+              {/* Corner Reticle Brackets */}
+              <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
+              <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
+              <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
+              <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
+
+              {/* Center Target Crosshair */}
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
+                <div className="w-16 h-16 border border-emerald-400/50 rounded-full flex items-center justify-center">
+                  <div className="w-2 h-2 bg-emerald-400 rounded-full" />
+                </div>
+              </div>
+
+              {/* SVG Facial Mesh Landmark Overlay */}
+              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 z-10" viewBox="0 0 320 240">
+                <g stroke="#10b981" strokeWidth="0.9" opacity="0.75">
+                  <line x1="120" y1="80" x2="160" y2="110"/>
+                  <line x1="200" y1="80" x2="160" y2="110"/>
+                  <line x1="160" y1="110" x2="140" y2="140"/>
+                  <line x1="160" y1="110" x2="180" y2="140"/>
+                  <line x1="140" y1="140" x2="115" y2="170"/>
+                  <line x1="180" y1="140" x2="205" y2="170"/>
+                  <line x1="140" y1="140" x2="180" y2="140"/>
+                </g>
+                <g fill="#34d399">
+                  <circle cx="120" cy="80" r="3" />
+                  <circle cx="200" cy="80" r="3" />
+                  <circle cx="160" cy="110" r="3.5" className="animate-pulse" />
+                  <circle cx="140" cy="140" r="2.5" />
+                  <circle cx="180" cy="140" r="2.5" />
+                </g>
+              </svg>
+
+              {/* Capturing Pulse */}
+              {capturando && (
+                <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-xs flex items-center justify-center z-20 animate-pulse">
+                  <span className="text-white font-black uppercase text-xs tracking-widest bg-black/80 px-4 py-2 rounded-xl border border-emerald-400 flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
+                    <span>REGISTRANDO PRESENÇA...</span>
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* Student Info Box below camera */}
+            <div className="bg-[#040812] border border-emerald-500/40 rounded-2xl p-4 text-left space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest">
+                  ALUNO SELECIONADO:
+                </span>
+                <span className="text-[10px] text-gray-400 font-mono">
+                  {dataBR}
+                </span>
+              </div>
+
+              <h3 className="text-xl font-black text-white uppercase tracking-wider font-chakra flex items-center gap-2">
+                <UserCheck className="w-5 h-5 text-emerald-400 shrink-0" />
+                <span>{modalAluno.nome}</span>
+              </h3>
+
+              <p className="text-xs text-gray-300 font-semibold uppercase flex items-center gap-1.5">
+                <span className="text-gray-500">TURMA:</span>
+                <span className="text-emerald-300 font-bold">{modalAluno.turma || 'SEM TURMA DEFINIDA'}</span>
+              </p>
+            </div>
+
+            {/* Success Banner or CONFIRMAR Button */}
+            {confirmSucesso ? (
+              <div className="bg-emerald-950/80 border-2 border-emerald-400 rounded-2xl p-4 text-center space-y-2 animate-scale-up">
+                <div className="flex items-center justify-center gap-2 text-emerald-400 font-black text-base uppercase">
+                  <CheckCircle className="w-6 h-6 stroke-[3]" />
+                  <span>PRESENÇA CONFIRMADA!</span>
+                </div>
+                <p className="text-xs text-emerald-200 font-mono font-bold">
+                  Horário: {confirmSucesso.hora} • {dataBR}
+                </p>
+                <p className="text-[10px] text-emerald-400/80 uppercase tracking-widest">
+                  Foto processada e descartada da memória ✓
+                </p>
+              </div>
+            ) : (
+              <button
+                type="button"
+                disabled={capturando}
+                onClick={handleConfirmarPresencaComFoto}
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-sm sm:text-base tracking-widest rounded-2xl transition cursor-pointer shadow-[0_0_25px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 active:scale-95"
+              >
+                <Camera className="w-5 h-5" />
+                <span>CONFIRMAR PRESENÇA</span>
+              </button>
             )}
-            {resultOverlay.syncState === 'ok' && (
-              <span className="text-emerald-400 flex items-center justify-center gap-1 font-mono">
-                <CheckCircle className="w-3 h-3" /> Sincronizado no Firestore!
-              </span>
-            )}
-            {resultOverlay.syncState === 'error' && (
-              <span className="text-rose-400 flex items-center justify-center gap-1 font-mono">
-                <AlertTriangle className="w-3 h-3" /> Falha na sincronização
-              </span>
-            )}
-          </div>
 
-          <div className="mt-6 flex flex-col sm:flex-row gap-3">
-            <button 
-              onClick={() => {
-                setResultOverlay({ open: false, syncState: 'syncing' });
-                desligarCamera();
-              }}
-              className="px-8 py-3 border border-emerald-400 bg-emerald-500/20 text-emerald-300 rounded-full text-xs uppercase font-bold hover:bg-emerald-500 hover:text-black transition cursor-pointer"
-            >
-              Próximo Aluno
-            </button>
-
+            {/* Cancel / Close Button */}
             <button
-              onClick={() => {
-                const idx = listaFiltrada.indexOf(resultOverlay.aluno!);
-                setResultOverlay({ open: false, syncState: 'syncing' });
-                desligarCamera();
-                if (idx !== -1) setCorrecaoIdx(idx);
-              }}
-              className="px-6 py-3 border border-rose-500/40 text-rose-400 rounded-full text-xs uppercase font-bold hover:bg-rose-500/20 transition cursor-pointer"
+              type="button"
+              onClick={fecharModalCamera}
+              className="w-full py-2.5 bg-black/40 border border-gray-700 hover:bg-gray-800 text-gray-300 font-bold uppercase text-xs rounded-xl transition cursor-pointer"
             >
-              Corrigir / Apagar
+              {confirmSucesso ? 'FECHAR' : 'CANCELAR'}
             </button>
+
           </div>
         </div>
       )}

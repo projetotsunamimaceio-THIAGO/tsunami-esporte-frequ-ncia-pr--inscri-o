@@ -45,6 +45,7 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
   const [permissoesMap, setPermissoesMap] = useState<Record<string, PermissaoAlunoEsporte>>({});
   const [inscricoesList, setInscricoesList] = useState<InscricaoEsporte[]>([]);
   const [inscricoesTrancadas, setInscricoesTrancadas] = useState<boolean>(false);
+  const [justificativasTrancadas, setJustificativasTrancadas] = useState<boolean>(false);
 
   // Selection States
   const [busca, setBusca] = useState<string>('');
@@ -84,7 +85,10 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     const unsubProg = subscribeFirestoreProgramacao(setProgramacaoItems);
     const unsubPerms = subscribeFirestorePermissoesEsporte(setPermissoesMap);
     const unsubInsc = subscribeFirestoreInscricoesEsporte(setInscricoesList);
-    const unsubConfig = subscribeFirestoreConfiguracaoEsporte(setInscricoesTrancadas);
+    const unsubConfig = subscribeFirestoreConfiguracaoEsporte((cfg) => {
+      setInscricoesTrancadas(cfg.trancado);
+      setJustificativasTrancadas(cfg.justificativasTrancadas);
+    });
 
     return () => {
       unsubAlunos();
@@ -191,6 +195,10 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
 
   // Iniciar Modo Justificar Sábado
   const startJustificarSabado = () => {
+    if (justificativasTrancadas) {
+      alert('🔒 AS JUSTIFICATIVAS ESTÃO TRANCADAS PELO PROFESSOR.\n\nNenhum aluno consegue enviar justificativa no momento.');
+      return;
+    }
     setMode('justificar-sabado');
     setStep(1);
     setSelectedAluno(null);
@@ -205,6 +213,20 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     setSelectedAluno(aluno);
     setSenhaInput('');
     setSenhaErro('');
+
+    // Se o aluno já tiver uma inscrição salva, carregar suas escolhas atuais
+    const inscricaoExistente = inscricoesList.find(
+      i => i.alunoNome.trim().toUpperCase() === aluno.nome.trim().toUpperCase()
+    );
+
+    if (inscricaoExistente) {
+      setCelulaConfirmada(inscricaoExistente.celulaConfirmada !== false);
+      setTurmasSelecionadas(inscricaoExistente.turmasSelecionadas || []);
+    } else {
+      setCelulaConfirmada(true);
+      setTurmasSelecionadas([]);
+    }
+
     setStep(2);
   };
 
@@ -228,6 +250,10 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
 
   // Toggle Seleção de Aula Esportiva
   const handleToggleTurma = (titulo: string) => {
+    if (!celulaConfirmada) {
+      alert('⚠️ PRESENÇA NA CÉLULA OBRIGATÓRIA!\n\nVocê desmarcou a presença na Célula Evangelística Tsunami. Conforme as regras, é obrigatório confirmar presença na Célula para se inscrever e jogar nas turmas esportivas.');
+      return;
+    }
     if (turmasSelecionadas.includes(titulo)) {
       setTurmasSelecionadas(turmasSelecionadas.filter(t => t !== titulo));
     } else {
@@ -244,9 +270,9 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
       alunoNome: selectedAluno.nome,
       turma: selectedAluno.turma || '',
       data: new Date().toISOString().split('T')[0],
-      celulaConfirmada: true,
+      celulaConfirmada: celulaConfirmada,
       celulaHora: celulaItem.hora || '19:45',
-      turmasSelecionadas: turmasSelecionadas,
+      turmasSelecionadas: celulaConfirmada ? turmasSelecionadas : [],
       criadoEm: new Date().toISOString()
     };
 
@@ -416,23 +442,38 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
               {/* BOTÃO 2: JUSTIFICAR SÁBADO */}
               <button
                 onClick={startJustificarSabado}
-                className="group p-5 rounded-3xl bg-[#081320] border-2 border-amber-500/60 hover:border-amber-400 hover:bg-[#1a1420] transition-all duration-300 text-left shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:shadow-[0_0_35px_rgba(245,158,11,0.3)] cursor-pointer relative overflow-hidden"
+                className={`group p-5 rounded-3xl transition-all duration-300 text-left shadow-lg cursor-pointer relative overflow-hidden border-2 ${
+                  justificativasTrancadas
+                    ? 'bg-rose-950/40 border-rose-500/80 hover:bg-rose-900/40 shadow-[0_0_20px_rgba(244,63,94,0.3)]'
+                    : 'bg-[#081320] border-amber-500/60 hover:border-amber-400 hover:bg-[#1a1420] shadow-[0_0_25px_rgba(245,158,11,0.15)] hover:shadow-[0_0_35px_rgba(245,158,11,0.3)]'
+                }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-2xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 group-hover:scale-110 transition shrink-0">
-                      <FileText className="w-5 h-5" />
+                    <div className={`w-10 h-10 rounded-2xl border flex items-center justify-center group-hover:scale-110 transition shrink-0 ${
+                      justificativasTrancadas
+                        ? 'bg-rose-500/20 border-rose-400 text-rose-300'
+                        : 'bg-amber-500/20 border-amber-400 text-amber-300'
+                    }`}>
+                      {justificativasTrancadas ? <Lock className="w-5 h-5 text-rose-400" /> : <FileText className="w-5 h-5" />}
                     </div>
                     <div>
-                      <h2 className="text-lg font-black text-white uppercase tracking-wider font-chakra group-hover:text-amber-300 transition">
-                        JUSTIFICAR SÁBADO
-                      </h2>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg font-black text-white uppercase tracking-wider font-chakra group-hover:text-amber-300 transition">
+                          JUSTIFICAR SÁBADO
+                        </h2>
+                        {justificativasTrancadas && (
+                          <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-rose-500/30 border border-rose-400 text-rose-300">
+                            🔒 TRANCADAS
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[10px] text-gray-400 uppercase tracking-widest mt-0.5">
-                        Envio de justificativa de falta
+                        {justificativasTrancadas ? 'Justificativas suspensas pelo professor' : 'Envio de justificativa de falta'}
                       </p>
                     </div>
                   </div>
-                  <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition" />
+                  <ChevronRight className={`w-5 h-5 group-hover:translate-x-1 transition ${justificativasTrancadas ? 'text-rose-400' : 'text-amber-400'}`} />
                 </div>
               </button>
 
@@ -668,21 +709,48 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                   </div>
 
                   {/* Toggle Check Célula */}
-                  <div className="bg-black/60 border border-yellow-500/40 rounded-2xl p-4 flex items-center justify-between">
-                    <span className="text-xs font-black text-white uppercase tracking-wider">
-                      CONFIRMAR PRESENÇA NA CÉLULA:
-                    </span>
+                  <div className={`p-4 rounded-2xl flex items-center justify-between border-2 transition ${
+                    celulaConfirmada
+                      ? 'bg-black/60 border-yellow-500/40'
+                      : 'bg-rose-950/40 border-rose-500/80 shadow-[0_0_15px_rgba(244,63,94,0.3)]'
+                  }`}>
+                    <div>
+                      <span className="text-xs font-black text-white uppercase tracking-wider block">
+                        CONFIRMAR PRESENÇA NA CÉLULA:
+                      </span>
+                      {!celulaConfirmada && (
+                        <span className="text-[10px] text-rose-300 font-bold uppercase tracking-wider mt-0.5 block flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-rose-400 shrink-0" />
+                          <span>Desmarcado! Sem a Célula, você não poderá jogar nenhuma modalidade.</span>
+                        </span>
+                      )}
+                    </div>
                     <button
                       type="button"
-                      onClick={() => setCelulaConfirmada(!celulaConfirmada)}
-                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 cursor-pointer ${
+                      onClick={() => {
+                        const novo = !celulaConfirmada;
+                        setCelulaConfirmada(novo);
+                        if (!novo) {
+                          setTurmasSelecionadas([]); // Limpa seleções se desmarcar Célula
+                        }
+                      }}
+                      className={`px-4 py-2.5 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 cursor-pointer ${
                         celulaConfirmada
-                          ? 'bg-yellow-400 text-black shadow-[0_0_12px_rgba(234,179,8,0.5)]'
-                          : 'bg-gray-800 text-gray-400 border border-gray-700'
+                          ? 'bg-yellow-400 text-black shadow-[0_0_12px_rgba(234,179,8,0.5)] hover:bg-yellow-300'
+                          : 'bg-rose-500/20 text-rose-300 border border-rose-400 hover:bg-rose-500/30'
                       }`}
                     >
-                      <Check className="w-4 h-4" />
-                      <span>{celulaConfirmada ? 'CONFIRMADO ✓' : 'MARCAR PRESENÇA'}</span>
+                      {celulaConfirmada ? (
+                        <>
+                          <Check className="w-4 h-4 stroke-[3]" />
+                          <span>CONFIRMADO ✓</span>
+                        </>
+                      ) : (
+                        <>
+                          <AlertCircle className="w-4 h-4 text-rose-400" />
+                          <span>DESMARCADO (NÃO VOU)</span>
+                        </>
+                      )}
                     </button>
                   </div>
 
@@ -697,8 +765,18 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
 
                     <button
                       type="button"
-                      onClick={() => setStep(4)}
-                      className="p-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase text-xs transition cursor-pointer shadow-[0_0_20px_rgba(234,179,8,0.4)]"
+                      onClick={() => {
+                        if (!celulaConfirmada) {
+                          alert('⚠️ PRESENÇA NA CÉLULA OBRIGATÓRIA!\n\nVocê desmarcou a presença na Célula Evangelística Tsunami.\n\nPara poder se inscrever e jogar nas turmas esportivas, é obrigatório confirmar presença na Célula.');
+                          return;
+                        }
+                        setStep(4);
+                      }}
+                      className={`p-3.5 rounded-2xl font-black uppercase text-xs transition cursor-pointer shadow-[0_0_20px_rgba(234,179,8,0.4)] ${
+                        celulaConfirmada
+                          ? 'bg-yellow-400 hover:bg-yellow-300 text-black'
+                          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
+                      }`}
                     >
                       AVANÇAR PARA AULAS
                     </button>
@@ -728,31 +806,57 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                 {/* Main Activities Selection Box */}
                 <div className="bg-[#080d19] border-2 border-emerald-500/60 rounded-3xl p-5 md:p-6 shadow-[0_0_30px_rgba(16,185,129,0.2)] space-y-5">
                   
-                  {/* Célula Confirmed Golden Banner */}
-                  <div className="bg-amber-950/50 border-2 border-amber-500/80 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.2)]">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 shrink-0">
-                        <Flame className="w-5 h-5 animate-pulse" />
+                  {/* Célula Confirmed Banner / Unconfirmed Warning Banner */}
+                  {celulaConfirmada ? (
+                    <div className="bg-amber-950/50 border-2 border-amber-500/80 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(245,158,11,0.2)]">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 shrink-0">
+                          <Flame className="w-5 h-5 animate-pulse" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-amber-300 uppercase tracking-wider font-chakra flex items-center gap-1.5">
+                            <span>CÉLULA CONFIRMADA ÀS {celulaItem.hora || '19:45'}</span>
+                            <Check className="w-4 h-4 text-amber-400 stroke-[3]" />
+                          </h4>
+                          <p className="text-[10px] text-amber-200/70 uppercase tracking-widest mt-0.5">
+                            Presença obrigatória registrada • Selecione as modalidades esportivas abaixo:
+                          </p>
+                        </div>
                       </div>
-                      <div>
-                        <h4 className="text-sm font-black text-amber-300 uppercase tracking-wider font-chakra flex items-center gap-1.5">
-                          <span>CÉLULA CONFIRMADA ÀS {celulaItem.hora || '19:45'}</span>
-                          <Check className="w-4 h-4 text-amber-400 stroke-[3]" />
-                        </h4>
-                        <p className="text-[10px] text-amber-200/70 uppercase tracking-widest mt-0.5">
-                          Presença obrigatória registrada • Selecione as modalidades esportivas abaixo:
-                        </p>
-                      </div>
-                    </div>
 
-                    <button 
-                      type="button"
-                      onClick={() => setStep(3)}
-                      className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/60 text-amber-300 hover:bg-amber-400 hover:text-black rounded-lg text-[10px] font-black uppercase transition cursor-pointer shrink-0"
-                    >
-                      VER HORÁRIO
-                    </button>
-                  </div>
+                      <button 
+                        type="button"
+                        onClick={() => setStep(3)}
+                        className="px-3 py-1.5 bg-amber-500/20 border border-amber-400/60 text-amber-300 hover:bg-amber-400 hover:text-black rounded-lg text-[10px] font-black uppercase transition cursor-pointer shrink-0"
+                      >
+                        ALTERAR
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-rose-950/50 border-2 border-rose-500/80 rounded-2xl p-4 flex items-center justify-between shadow-[0_0_15px_rgba(244,63,94,0.3)] animate-pulse">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-rose-500/20 border border-rose-400 flex items-center justify-center text-rose-300 shrink-0">
+                          <AlertCircle className="w-5 h-5 text-rose-400" />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-rose-300 uppercase tracking-wider font-chakra flex items-center gap-1.5">
+                            <span>CÉLULA NÃO CONFIRMADA</span>
+                          </h4>
+                          <p className="text-[10px] text-rose-200/80 uppercase tracking-widest mt-0.5">
+                            ⚠️ Presença desmarcada! Você não pode marcar nenhuma turma para jogar.
+                          </p>
+                        </div>
+                      </div>
+
+                      <button 
+                        type="button"
+                        onClick={() => setStep(3)}
+                        className="px-3 py-1.5 bg-rose-500/30 border border-rose-400 text-rose-200 hover:bg-rose-400 hover:text-black rounded-lg text-[10px] font-black uppercase transition cursor-pointer shrink-0"
+                      >
+                        CONFIRMAR CÉLULA
+                      </button>
+                    </div>
+                  )}
 
                   {/* Header Count */}
                   <div className="flex items-center justify-between text-xs font-black uppercase text-emerald-400 tracking-wider">
@@ -776,7 +880,9 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                             key={act.id}
                             onClick={() => handleToggleTurma(act.titulo)}
                             className={`p-4 rounded-2xl border transition-all duration-200 flex items-center justify-between cursor-pointer ${
-                              isSelected
+                              !celulaConfirmada
+                                ? 'bg-gray-900/40 border-gray-800 opacity-50'
+                                : isSelected
                                 ? 'bg-[#091829] border-cyan-400 shadow-[0_0_15px_rgba(6,182,212,0.3)]'
                                 : 'bg-[#090d1a] border-cyan-900/40 hover:border-cyan-500/60 hover:bg-[#0c1428]'
                             }`}
@@ -792,11 +898,13 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
 
                             {/* Radio Circle */}
                             <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition ${
-                              isSelected
+                              !celulaConfirmada
+                                ? 'border-gray-700 bg-gray-800 text-gray-600'
+                                : isSelected
                                 ? 'border-cyan-400 bg-cyan-500/20 text-cyan-300 shadow-[0_0_8px_#06b6d4]'
                                 : 'border-gray-600'
                             }`}>
-                              {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />}
+                              {isSelected && celulaConfirmada && <div className="w-2.5 h-2.5 rounded-full bg-cyan-400" />}
                             </div>
                           </div>
                         );
@@ -808,10 +916,17 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                   <div className="bg-[#050e1a] border border-cyan-900/60 rounded-2xl p-4 space-y-2 text-xs">
                     <div className="flex justify-between items-center">
                       <span className="text-gray-400 uppercase">Célula (Reunião Evangelística):</span>
-                      <span className="text-amber-400 font-bold uppercase flex items-center gap-1">
-                        <Check className="w-3.5 h-3.5" />
-                        Confirmado às {celulaItem.hora || '19:45'} (Obrigatório)
-                      </span>
+                      {celulaConfirmada ? (
+                        <span className="text-amber-400 font-bold uppercase flex items-center gap-1">
+                          <Check className="w-3.5 h-3.5" />
+                          Confirmado às {celulaItem.hora || '19:45'} (Obrigatório)
+                        </span>
+                      ) : (
+                        <span className="text-rose-400 font-bold uppercase flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          DESMARCADO (NÃO CONFIRMADO)
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex justify-between items-center border-t border-white/5 pt-2">

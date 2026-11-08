@@ -8,7 +8,8 @@ import {
   Sparkles, 
   Share2, 
   X,
-  Trophy
+  Trophy,
+  Flame
 } from 'lucide-react';
 import { ProgramacaoItem, InscricaoEsporte } from '../types';
 import { 
@@ -33,9 +34,22 @@ export function ListaInscricoesWidget() {
 
   useEffect(() => {
     const unsubProg = subscribeFirestoreProgramacao((list) => {
-      // Filtrar apenas atividades esportivas (não a Célula)
-      const apenasEsportes = list.filter(i => !(i.isFixa || i.id === 'celula_fixa'));
-      setAtividades(apenasEsportes);
+      let comCelula = [...list];
+      const temCelula = comCelula.some(
+        i => i.isFixa || i.id === 'celula_fixa' || i.titulo.toUpperCase().includes('CÉLULA') || i.titulo.toUpperCase().includes('CELULA')
+      );
+      if (!temCelula) {
+        comCelula.unshift({
+          id: 'celula_fixa',
+          titulo: 'CÉLULA EVANGELÍSTICA TSUNAMI',
+          hora: '19:45',
+          dias: ['seg', 'qua', 'sex'],
+          isFixa: true
+        });
+      }
+      // Ordenar cronologicamente pelo horário (ex: 19:45, 20:00, etc.)
+      comCelula.sort((a, b) => (a.hora || '00:00').localeCompare(b.hora || '00:00'));
+      setAtividades(comCelula);
     });
 
     const unsubInsc = subscribeFirestoreInscricoesEsporte((list) => {
@@ -48,13 +62,17 @@ export function ListaInscricoesWidget() {
     };
   }, []);
 
-  // Obter inscritos em cada atividade específica
-  const getInscritosPorAtividade = (tituloAtividade: string) => {
+  // Obter inscritos em cada atividade específica (esporte ou célula)
+  const getInscritosPorAtividade = (tituloAtividade: string, isCelula: boolean) => {
     const inscritosUnicos: { nome: string; turma: string }[] = [];
     const nomesVistos = new Set<string>();
 
     inscricoes.forEach(ins => {
-      if (ins.turmasSelecionadas && ins.turmasSelecionadas.includes(tituloAtividade)) {
+      const bateuAtividade = isCelula
+        ? (ins.celulaConfirmada !== false)
+        : (ins.turmasSelecionadas && ins.turmasSelecionadas.includes(tituloAtividade));
+
+      if (bateuAtividade) {
         const key = ins.alunoNome.trim().toUpperCase();
         if (!nomesVistos.has(key)) {
           nomesVistos.add(key);
@@ -71,7 +89,7 @@ export function ListaInscricoesWidget() {
 
   // Sorteio de Linhas (Times/Linhas de 5 atletas)
   const handleSortearLinhas = (tituloAtividade: string) => {
-    const inscritos = getInscritosPorAtividade(tituloAtividade);
+    const inscritos = getInscritosPorAtividade(tituloAtividade, false);
     if (inscritos.length === 0) {
       alert('Nenhum aluno inscrito nesta modalidade ainda para sortear linhas!');
       return;
@@ -133,74 +151,110 @@ export function ListaInscricoesWidget() {
           </div>
         ) : (
           atividades.map((act) => {
-            const vagasTotais = 15; // Capacidade padrão por modalidade
-            const inscritos = getInscritosPorAtividade(act.titulo);
+            const isCelula = act.isFixa || act.id === 'celula_fixa' || act.titulo.toUpperCase().includes('CÉLULA') || act.titulo.toUpperCase().includes('CELULA');
+            const vagasTotais = isCelula ? 100 : (act.vagas || 15);
+            const inscritos = getInscritosPorAtividade(act.titulo, isCelula);
             const qtdInscritos = inscritos.length;
-            const vagasRestantes = Math.max(0, vagasTotais - qtdInscritos);
-            const porcentagem = Math.min(100, Math.round((qtdInscritos / vagasTotais) * 100));
+            const vagasRestantes = isCelula ? Math.max(0, 100 - qtdInscritos) : Math.max(0, vagasTotais - qtdInscritos);
+            const porcentagem = isCelula ? Math.min(100, Math.round((qtdInscritos / 100) * 100)) : Math.min(100, Math.round((qtdInscritos / vagasTotais) * 100));
 
             return (
               <div 
                 key={act.id}
-                className="bg-[#080e1c] border border-emerald-500/40 rounded-2xl p-5 transition hover:border-emerald-400/80 shadow-lg space-y-4"
+                className={`border rounded-2xl p-5 transition shadow-lg space-y-4 ${
+                  isCelula
+                    ? 'bg-[#120e06] border-amber-500/60 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                    : 'bg-[#080e1c] border-emerald-500/40 hover:border-emerald-400/80'
+                }`}
               >
                 {/* Top Row: Title, Badge, Time & Sortear Linhas Button */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                   <div className="flex flex-wrap items-center gap-3">
-                    <h3 className="text-xl font-black font-chakra text-white uppercase tracking-wider">
+                    {isCelula && (
+                      <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-400 flex items-center justify-center text-amber-300 shrink-0">
+                        <Flame className="w-4 h-4 text-amber-400 animate-pulse" />
+                      </div>
+                    )}
+                    <h3 className={`text-xl font-black font-chakra uppercase tracking-wider ${isCelula ? 'text-amber-300' : 'text-white'}`}>
                       {act.titulo}
                     </h3>
-                    <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 font-extrabold text-[10px] uppercase">
-                      {vagasTotais} VAGAS
-                    </span>
+                    
+                    {isCelula ? (
+                      <span className="px-2.5 py-0.5 rounded-md bg-amber-500/20 border border-amber-400/80 text-amber-300 font-black text-[10px] uppercase">
+                        PRESENÇA OBRIGATÓRIA
+                      </span>
+                    ) : (
+                      <span className="px-2.5 py-0.5 rounded-md bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 font-extrabold text-[10px] uppercase">
+                        {vagasTotais} VAGAS
+                      </span>
+                    )}
+
                     <span className="text-xs font-mono text-gray-400 flex items-center gap-1 font-bold">
-                      <Clock className="w-3.5 h-3.5 text-emerald-400" />
-                      {act.hora || '20:00'}
+                      <Clock className={`w-3.5 h-3.5 ${isCelula ? 'text-amber-400' : 'text-emerald-400'}`} />
+                      {act.hora || (isCelula ? '19:45' : '20:00')}
                     </span>
                   </div>
 
-                  <button
-                    onClick={() => handleSortearLinhas(act.titulo)}
-                    className="px-4 py-2 bg-emerald-950/80 border border-emerald-500/80 text-emerald-300 hover:bg-emerald-500 hover:text-black rounded-xl font-extrabold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.3)] shrink-0"
-                  >
-                    <Shuffle className="w-3.5 h-3.5" />
-                    <span>SORTEAR LINHAS ⚖️</span>
-                  </button>
+                  {!isCelula ? (
+                    <button
+                      onClick={() => handleSortearLinhas(act.titulo)}
+                      className="px-4 py-2 bg-emerald-950/80 border border-emerald-500/80 text-emerald-300 hover:bg-emerald-500 hover:text-black rounded-xl font-extrabold text-xs uppercase tracking-wider transition flex items-center justify-center gap-2 cursor-pointer shadow-[0_0_12px_rgba(16,185,129,0.3)] shrink-0"
+                    >
+                      <Shuffle className="w-3.5 h-3.5" />
+                      <span>SORTEAR LINHAS ⚖️</span>
+                    </button>
+                  ) : (
+                    <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-[11px] font-black uppercase tracking-wider shrink-0">
+                      CÉLULA EVANGELÍSTICA TSUNAMI
+                    </div>
+                  )}
                 </div>
 
                 {/* Progress Bar & Vacancies Status */}
                 <div className="space-y-1.5">
                   <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-wider">
-                    <span className="text-emerald-400 font-black">
-                      {vagasRestantes} VAGAS RESTANTES
+                    <span className={`font-black ${isCelula ? 'text-amber-400' : 'text-emerald-400'}`}>
+                      {isCelula ? `${qtdInscritos} CONFIRMADOS NA CÉLULA` : `${vagasRestantes} VAGAS RESTANTES`}
                     </span>
                     <span className="text-gray-400 font-mono">
-                      {qtdInscritos} / {vagasTotais} ({porcentagem}%)
+                      {qtdInscritos} CONFIRMAÇÕES
                     </span>
                   </div>
 
-                  <div className="w-full h-2 bg-gray-900 border border-emerald-500/20 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-gray-900 border rounded-full overflow-hidden border-gray-800">
                     <div 
-                      className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-500 shadow-[0_0_8px_#10b981]"
-                      style={{ width: `${porcentagem}%` }}
+                      className={`h-full transition-all duration-500 ${
+                        isCelula 
+                          ? 'bg-gradient-to-r from-amber-500 to-yellow-300 shadow-[0_0_8px_#f59e0b]' 
+                          : 'bg-gradient-to-r from-emerald-500 to-emerald-300 shadow-[0_0_8px_#10b981]'
+                      }`}
+                      style={{ width: `${Math.max(5, porcentagem)}%` }}
                     />
                   </div>
                 </div>
 
                 {/* Inner Enrolled Students Box matching image 2 */}
-                <div className="bg-[#030710] border border-dashed border-emerald-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className={`border border-dashed rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  isCelula 
+                    ? 'bg-black/50 border-amber-500/40' 
+                    : 'bg-[#030710] border-emerald-500/30'
+                }`}>
                   {qtdInscritos === 0 ? (
-                    <div className="text-xs font-bold text-emerald-400/70 uppercase tracking-wider">
-                      NENHUM ALUNO INSCRITO AINDA
+                    <div className={`text-xs font-bold uppercase tracking-wider ${isCelula ? 'text-amber-400/80' : 'text-emerald-400/70'}`}>
+                      NENHUM ALUNO CONFIRMADO AINDA
                     </div>
                   ) : (
                     <div className="flex flex-wrap items-center gap-2 max-h-28 overflow-y-auto">
                       {inscritos.map((aluno, i) => (
                         <span 
                           key={i}
-                          className="px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-400/50 text-emerald-200 font-bold text-[11px] uppercase flex items-center gap-1.5"
+                          className={`px-2.5 py-1 rounded-lg border font-bold text-[11px] uppercase flex items-center gap-1.5 ${
+                            isCelula
+                              ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
+                              : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
+                          }`}
                         >
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isCelula ? 'bg-amber-400' : 'bg-emerald-400'}`}></span>
                           {aluno.nome}
                         </span>
                       ))}
@@ -208,8 +262,12 @@ export function ListaInscricoesWidget() {
                   )}
 
                   <div className="shrink-0 text-right">
-                    <span className="px-3 py-1 bg-emerald-500/15 border border-emerald-500/40 text-emerald-400 font-extrabold text-xs uppercase rounded-lg inline-block">
-                      {vagasRestantes} VAGAS LIVRES
+                    <span className={`px-3 py-1 font-extrabold text-xs uppercase rounded-lg inline-block border ${
+                      isCelula
+                        ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
+                        : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                    }`}>
+                      {isCelula ? `${qtdInscritos} ALUNOS NA CÉLULA` : `${vagasRestantes} VAGAS LIVRES`}
                     </span>
                   </div>
                 </div>

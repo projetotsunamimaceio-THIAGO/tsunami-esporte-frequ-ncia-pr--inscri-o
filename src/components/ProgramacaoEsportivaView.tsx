@@ -54,6 +54,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   const [alunos, setAlunos] = useState<Aluno[]>([]);
   const [permissoesMap, setPermissoesMap] = useState<Record<string, PermissaoAlunoEsporte>>({});
   const [inscricoesTrancadas, setInscricoesTrancadas] = useState<boolean>(false);
+  const [justificativasTrancadas, setJustificativasTrancadas] = useState<boolean>(false);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [saveSuccessId, setSaveSuccessId] = useState<string | null>(null);
@@ -101,8 +102,9 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
       setPermissoesMap(map);
     });
 
-    const unsubConfig = subscribeFirestoreConfiguracaoEsporte((trancado) => {
-      setInscricoesTrancadas(trancado);
+    const unsubConfig = subscribeFirestoreConfiguracaoEsporte((config) => {
+      setInscricoesTrancadas(config.trancado);
+      setJustificativasTrancadas(config.justificativasTrancadas);
     });
 
     return () => {
@@ -317,7 +319,13 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   const handleToggleTrancarInscricoes = async () => {
     const novoStatus = !inscricoesTrancadas;
     setInscricoesTrancadas(novoStatus);
-    await saveFirestoreConfiguracaoEsporte(novoStatus);
+    await saveFirestoreConfiguracaoEsporte(novoStatus, justificativasTrancadas);
+  };
+
+  const handleToggleTrancarJustificativas = async () => {
+    const novoStatus = !justificativasTrancadas;
+    setJustificativasTrancadas(novoStatus);
+    await saveFirestoreConfiguracaoEsporte(inscricoesTrancadas, novoStatus);
   };
 
   const handleResetarInscricoes = async () => {
@@ -645,8 +653,20 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                     <span>CONTROLE DE ALUNOS & ACESSOS</span>
                   </h2>
 
-                  {/* Top Action Buttons (Trancar / Resetar) */}
+                  {/* Top Action Buttons (Trancar Justificativas / Trancar Inscrições / Resetar) */}
                   <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={handleToggleTrancarJustificativas}
+                      className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 border cursor-pointer ${
+                        justificativasTrancadas
+                          ? 'bg-rose-500/20 border-rose-500 text-rose-400 hover:bg-rose-500 hover:text-black'
+                          : 'bg-amber-500/15 border-amber-500/80 text-amber-400 hover:bg-amber-500 hover:text-black'
+                      }`}
+                    >
+                      {justificativasTrancadas ? <Lock className="w-3.5 h-3.5" /> : <Unlock className="w-3.5 h-3.5" />}
+                      <span>{justificativasTrancadas ? 'LIBERAR JUSTIFICATIVAS' : 'TRANCAR JUSTIFICATIVAS'}</span>
+                    </button>
+
                     <button
                       onClick={handleToggleTrancarInscricoes}
                       className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 border cursor-pointer ${
@@ -729,7 +749,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
 
                 {/* Search Bar for Alunos */}
                 <div className="mt-4 relative">
-                  <Search className="w-4 h-4 text-emerald-400 absolute left-3 top.1/2 -translate-y-1/2 top-3.5" />
+                  <Search className="w-4 h-4 text-emerald-400 absolute left-3 top-1/2 -translate-y-1/2 top-3.5" />
                   <input 
                     type="text" 
                     value={buscaAluno}
@@ -740,11 +760,21 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                 </div>
               </div>
 
-              {/* Inscrições Trancadas Warning Banner */}
-              {inscricoesTrancadas && (
-                <div className="mb-6 bg-rose-950/80 border-2 border-rose-500/80 rounded-2xl p-4 text-center flex items-center justify-center gap-3 text-rose-300 font-bold uppercase text-xs tracking-wider animate-pulse">
-                  <ShieldAlert className="w-5 h-5 text-rose-400" />
-                  <span>INSCRIÇÕES TRANCADAS GLOBALMENTE PELO PROFESSOR</span>
+              {/* Warning Banners */}
+              {(inscricoesTrancadas || justificativasTrancadas) && (
+                <div className="mb-6 space-y-2">
+                  {inscricoesTrancadas && (
+                    <div className="bg-rose-950/80 border-2 border-rose-500/80 rounded-2xl p-3.5 text-center flex items-center justify-center gap-3 text-rose-300 font-bold uppercase text-xs tracking-wider animate-pulse">
+                      <ShieldAlert className="w-5 h-5 text-rose-400" />
+                      <span>INSCRIÇÕES TRANCADAS GLOBALMENTE PELO PROFESSOR</span>
+                    </div>
+                  )}
+                  {justificativasTrancadas && (
+                    <div className="bg-amber-950/80 border-2 border-amber-500/80 rounded-2xl p-3.5 text-center flex items-center justify-center gap-3 text-amber-300 font-bold uppercase text-xs tracking-wider animate-pulse">
+                      <ShieldAlert className="w-5 h-5 text-amber-400" />
+                      <span>JUSTIFICATIVAS TRANCADAS GLOBALMENTE PELO PROFESSOR</span>
+                    </div>
+                  )}
                 </div>
               )}
 

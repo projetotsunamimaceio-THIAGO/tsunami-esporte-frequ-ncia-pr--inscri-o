@@ -12,7 +12,7 @@ import { EsporteView } from './components/EsporteView';
 
 export default function App() {
   const [activeView, setActiveView] = useState<
-    'home' | 'login' | 'admin-dashboard' | 'turmas' | 'alunos' | 'relatorio' | 'arena' | 'arena-facial' | 'programacao-esportiva' | 'esporte-info'
+    'home' | 'login' | 'admin-dashboard' | 'turmas' | 'alunos' | 'relatorio' | 'relatorio-pontuacao' | 'arena' | 'arena-facial' | 'programacao-esportiva' | 'esporte-info'
   >('home');
 
   const checkLogged = () => {
@@ -43,6 +43,7 @@ export default function App() {
         <HomeView 
           onOpenAdmin={handleOpenAdmin} 
           onOpenEsporte={() => setActiveView('esporte-info')} 
+          onOpenRelatorioPontuacao={() => setActiveView('relatorio-pontuacao')}
         />
       )}
 
@@ -88,12 +89,17 @@ export default function App() {
         <ProgramacaoEsportivaView onBack={() => setActiveView('admin-dashboard')} />
       )}
 
-      {/* 9. Relatório Statistics View */}
+      {/* 9. Relatório Statistics View (Admin) */}
       {activeView === 'relatorio' && (
         <RelatorioView onBack={() => setActiveView('admin-dashboard')} />
       )}
 
-      {/* 10. Área de Esporte (Pré Inscrição & Justificativas) */}
+      {/* 10. Relatório de Pontuação View (Aluno / Público) */}
+      {activeView === 'relatorio-pontuacao' && (
+        <RelatorioView onBack={() => setActiveView('home')} apenasPontuacao={true} />
+      )}
+
+      {/* 11. Área de Esporte (Pré Inscrição & Justificativas) */}
       {activeView === 'esporte-info' && (
         <EsporteView onBackToHome={() => setActiveView('home')} />
       )}
