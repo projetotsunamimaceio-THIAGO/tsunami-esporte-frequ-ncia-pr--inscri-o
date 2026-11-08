@@ -121,16 +121,53 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     };
   };
 
-  // Alunos Filtrados para Pré Inscrição (liberado !== false)
+  // Helper para datas em formato ISO YYYY-MM-DD
+  const getISOString = (val?: string): string => {
+    if (!val) return '';
+    if (val.includes('/')) {
+      const parts = val.split('/');
+      if (parts.length === 3) {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2];
+        return `${year}-${month}-${day}`;
+      }
+    }
+    return val;
+  };
+
+  const hojeISO = new Date().toISOString().split('T')[0];
+
+  const ativoNoPeriodo = (aluno: Aluno): boolean => {
+    const mat = getISOString(aluno.matricula_rematricula);
+    const ven = getISOString(aluno.data_vencimento);
+    if (mat && ven && hojeISO >= mat && hojeISO <= ven) return true;
+
+    if (aluno.historico_matriculas && Array.isArray(aluno.historico_matriculas)) {
+      for (const p of aluno.historico_matriculas) {
+        const hMat = getISOString(p.inicio);
+        const hVen = getISOString(p.fim);
+        if (hMat && hVen && hojeISO >= hMat && hojeISO <= hVen) return true;
+      }
+    }
+
+    if (!mat && !ven && (!aluno.historico_matriculas || aluno.historico_matriculas.length === 0)) return true;
+
+    return false;
+  };
+
+  // Alunos Filtrados para Pré Inscrição (apenas matriculados/ativos no período e liberado !== false)
   const alunosDisponiveisInscricao = alunos.filter(a => {
+    if (!ativoNoPeriodo(a)) return false;
     const p = getPermissao(a);
     const matchBusca = a.nome.toLowerCase().includes(busca.toLowerCase()) || 
                        (a.turma || '').toLowerCase().includes(busca.toLowerCase());
     return p.liberado !== false && matchBusca;
   });
 
-  // Alunos Filtrados para Justificativa (liberadoJustificativa === true)
+  // Alunos Filtrados para Justificativa (apenas matriculados/ativos no período e liberadoJustificativa === true)
   const alunosDisponiveisJustificativa = alunos.filter(a => {
+    if (!ativoNoPeriodo(a)) return false;
     const p = getPermissao(a);
     const matchBusca = a.nome.toLowerCase().includes(busca.toLowerCase()) || 
                        (a.turma || '').toLowerCase().includes(busca.toLowerCase());
@@ -398,141 +435,6 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                   <ChevronRight className="w-5 h-5 text-amber-400 group-hover:translate-x-1 transition" />
                 </div>
               </button>
-
-            </div>
-
-            {/* ======================================================== */}
-            {/* SEÇÃO: LISTA DE INSCRIÇÃO (EXACT MATCH TO screenshot image_a141780a.png) */}
-            {/* ======================================================== */}
-            <div className="pt-6">
-              
-              {/* Title & Underline */}
-              <div className="text-center mb-6">
-                <h2 className="text-2xl md:text-3xl font-black font-chakra uppercase text-white tracking-[0.15em]">
-                  LISTA DE INSCRIÇÃO
-                </h2>
-                <div className="w-48 h-1 bg-white mx-auto mt-2 rounded-full shadow-[0_0_10px_#ffffff]"></div>
-              </div>
-
-              {/* Main Outer Box */}
-              <div className="bg-[#060a14] border-2 border-emerald-500/60 rounded-3xl p-5 md:p-7 space-y-6 shadow-[0_0_35px_rgba(16,185,129,0.2)]">
-                
-                {atividadesDinamicas.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500 text-xs uppercase font-bold tracking-widest">
-                    Nenhuma modalidade esportiva cadastrada na programação.
-                  </div>
-                ) : (
-                  atividadesDinamicas.map((act) => {
-                    const vagasTotais = getVagasPadrao(act);
-                    
-                    // Alunos inscritos nesta aula
-                    const inscritos = inscricoesList
-                      .filter(i => i.turmasSelecionadas.includes(act.titulo))
-                      .map(i => i.alunoNome.toUpperCase());
-
-                    // Remover duplicatas se houver
-                    const inscritosUnicos = [...new Set(inscritos)];
-                    const countInscritos = inscritosUnicos.length;
-                    const vagasRestantes = Math.max(0, vagasTotais - countInscritos);
-                    const percentual = Math.min(100, Math.round((countInscritos / vagasTotais) * 100));
-
-                    return (
-                      <div 
-                        key={act.id}
-                        className="bg-[#080d19] border border-emerald-500/40 rounded-2xl p-5 shadow-lg space-y-4 text-left"
-                      >
-                        
-                        {/* Card Header */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-white/5">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-black text-white uppercase tracking-wider font-chakra">
-                                {act.titulo}
-                              </h3>
-                              <span className="bg-emerald-500/15 border border-emerald-400 text-emerald-300 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase font-mono">
-                                {vagasTotais} VAGAS
-                              </span>
-                            </div>
-                            <p className="text-xs font-mono text-gray-400 mt-1">
-                              {act.hora || '20:00'}
-                            </p>
-                          </div>
-
-                          {/* Action Button: SORTEAR LINHAS */}
-                          <button
-                            onClick={() => handleSortearLinhas(act.titulo)}
-                            className="px-3.5 py-2 bg-emerald-500/15 border border-emerald-400/80 text-emerald-300 hover:bg-emerald-500 hover:text-black transition rounded-xl text-xs font-black uppercase flex items-center gap-2 cursor-pointer shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.25)]"
-                          >
-                            <Shuffle className="w-3.5 h-3.5" />
-                            <span>SORTEAR LINHAS ⚖️</span>
-                          </button>
-                        </div>
-
-                        {/* Capacity Stats & Bar */}
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider">
-                            <span className="text-emerald-400">
-                              {vagasRestantes} VAGAS RESTANTES
-                            </span>
-                            <span className="text-emerald-400/90 font-mono">
-                              {countInscritos} / {vagasTotais} ({percentual}%)
-                            </span>
-                          </div>
-
-                          <div className="w-full bg-gray-950 border border-emerald-500/30 rounded-full h-2 overflow-hidden p-0.5">
-                            <div 
-                              className="bg-emerald-400 h-full rounded-full transition-all duration-500 shadow-[0_0_8px_#10b981]"
-                              style={{ width: `${percentual}%` }}
-                            />
-                          </div>
-                        </div>
-
-                        {/* Inner Box with Registered Students */}
-                        <div className="border border-emerald-500/30 border-dashed rounded-2xl p-4 bg-black/40">
-                          {countInscritos === 0 ? (
-                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-center sm:text-left">
-                              <span className="text-xs font-black text-emerald-400/80 uppercase tracking-widest">
-                                NENHUM ALUNO INSCRITO AINDA
-                              </span>
-                              <span className="px-3 py-1 bg-emerald-500/15 border border-emerald-500/40 rounded-lg text-[10px] font-black text-emerald-400 uppercase">
-                                {vagasTotais} VAGAS LIVRES
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="space-y-3">
-                              <div className="flex items-center justify-between border-b border-emerald-500/20 pb-2">
-                                <span className="text-xs font-black text-emerald-400 uppercase tracking-wider flex items-center gap-1.5">
-                                  <Users className="w-3.5 h-3.5" />
-                                  <span>INSCRITOS CONFIRMADOS ({countInscritos}):</span>
-                                </span>
-                                <span className="px-2.5 py-0.5 bg-emerald-500/15 border border-emerald-500/40 rounded-md text-[10px] font-black text-emerald-400 uppercase">
-                                  {vagasRestantes} VAGAS LIVRES
-                                </span>
-                              </div>
-
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                                {inscritosUnicos.map((nome, idx) => (
-                                  <div 
-                                    key={idx}
-                                    className="p-2 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 font-extrabold text-xs uppercase flex items-center gap-2"
-                                  >
-                                    <span className="w-5 h-5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 flex items-center justify-center text-[10px] font-mono shrink-0">
-                                      {idx + 1}
-                                    </span>
-                                    <span className="truncate">{nome}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                      </div>
-                    );
-                  })
-                )}
-
-              </div>
 
             </div>
 
