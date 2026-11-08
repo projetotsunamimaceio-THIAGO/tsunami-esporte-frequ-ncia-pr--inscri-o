@@ -209,6 +209,8 @@ export function ArenaView({ onBack }: ArenaViewProps) {
     setJustModal({ open: false, aIdx: -1, dIdx: -1, texto: '' });
   };
 
+  const CICLO_ALL = ['F', 'P', 'A', ''];
+
   const loteDia = (dIdx: number) => {
     const dia = dias[dIdx];
     let primeiro = '';
@@ -218,8 +220,10 @@ export function ArenaView({ onBack }: ArenaViewProps) {
         break;
       }
     }
-    const prox = CICLO[(CICLO.indexOf(primeiro) + 1) % CICLO.length];
-    if (prox === 'J') return;
+
+    const idxAtual = CICLO_ALL.indexOf(primeiro);
+    const proxIndex = idxAtual >= 0 ? (idxAtual + 1) % CICLO_ALL.length : 0;
+    const prox = CICLO_ALL[proxIndex];
 
     const agora = new Date();
     const hStr = agora.getHours().toString().padStart(2, '0') + ':' + agora.getMinutes().toString().padStart(2, '0') + ':' + agora.getSeconds().toString().padStart(2, '0');
