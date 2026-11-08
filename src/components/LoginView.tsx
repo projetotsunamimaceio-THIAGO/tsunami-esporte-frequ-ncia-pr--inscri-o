@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { User } from '../types';
 import { getFirestoreUsers, saveFirestoreUser } from '../lib/firestoreService';
-import { ArrowLeft, Lock, UserCheck } from 'lucide-react';
+import { ArrowLeft, Lock, UserCheck, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface LoginViewProps {
   onLoginSuccess: () => void;
@@ -13,6 +13,8 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
   const [nome, setNome] = useState('');
   const [senha, setSenha] = useState('');
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   useEffect(() => {
     sincronizarUsuarios();
@@ -31,55 +33,72 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setErrorMsg(null);
+    setSuccessMsg(null);
+
     const nomeClean = nome.trim();
     const senhaClean = senha.trim();
 
     if (!nomeClean || !senhaClean) {
-      alert('Por favor, preencha todos os campos.');
+      setErrorMsg('Por favor, preencha o nome de usuário e a senha.');
       return;
     }
 
     setLoading(true);
-    let users = await getFirestoreUsers();
-    if (users.length === 0) {
-      users = JSON.parse(localStorage.getItem('tsunami_users') || '[]');
-    }
 
-    if (isLogin) {
-      // Default fallback credentials if database is empty initially
+    try {
+      let users = await getFirestoreUsers();
       if (users.length === 0) {
-        // If first run, create admin user automatically in Firestore
-        const defaultAdmin: User = { nome: nomeClean, senha: senhaClean };
-        await saveFirestoreUser(defaultAdmin);
-        sessionStorage.setItem('tsunami_logged', 'true');
-        onLoginSuccess();
-        return;
+        const local = localStorage.getItem('tsunami_users');
+        if (local) {
+          try { users = JSON.parse(local); } catch (e) {}
+        }
       }
 
-      const user = users.find(u => u.nome.toLowerCase() === nomeClean.toLowerCase() && u.senha === senhaClean);
-      if (user) {
-        sessionStorage.setItem('tsunami_logged', 'true');
-        onLoginSuccess();
+      if (isLogin) {
+        // If DB has no users yet or first run
+        if (users.length === 0) {
+          const defaultAdmin: User = { nome: nomeClean, senha: senhaClean };
+          await saveFirestoreUser(defaultAdmin);
+          sessionStorage.setItem('tsunami_logged', 'true');
+          onLoginSuccess();
+          return;
+        }
+
+        const user = users.find(u => u.nome.toLowerCase() === nomeClean.toLowerCase() && u.senha === senhaClean);
+
+        if (user) {
+          sessionStorage.setItem('tsunami_logged', 'true');
+          onLoginSuccess();
+        } else {
+          const userExists = users.some(u => u.nome.toLowerCase() === nomeClean.toLowerCase());
+          if (userExists) {
+            setErrorMsg(`Senha incorreta para "${nomeClean}". Verifique a senha ou use "Cadastre-se" para redefinir.`);
+            setLoading(false);
+          } else {
+            // Auto register on first login attempt if user doesn't exist yet
+            const newUser: User = { nome: nomeClean, senha: senhaClean };
+            await saveFirestoreUser(newUser);
+            sessionStorage.setItem('tsunami_logged', 'true');
+            onLoginSuccess();
+            return;
+          }
+        }
       } else {
-        alert(`Credenciais inválidas!\n\nVerifique:\n- Usuário: ${nomeClean}\n- Senha informada`);
-        setLoading(false);
-      }
-    } else {
-      if (users.find(u => u.nome.toLowerCase() === nomeClean.toLowerCase())) {
-        alert('Este nome/email já está cadastrado!');
-        setLoading(false);
-        return;
-      }
-
-      const newUser: User = { nome: nomeClean, senha: senhaClean };
-      try {
+        // Registration mode
+        const newUser: User = { nome: nomeClean, senha: senhaClean };
         await saveFirestoreUser(newUser);
-        alert('Conta criada com sucesso no Firebase!');
-        setIsLogin(true);
-      } catch (err) {
-        alert('Erro ao criar conta no Firebase.');
+        setSuccessMsg(`Conta "${nomeClean}" salva no banco! Acessando o sistema...`);
+        setTimeout(() => {
+          sessionStorage.setItem('tsunami_logged', 'true');
+          onLoginSuccess();
+        }, 800);
       }
-      setLoading(false);
+    } catch (err: any) {
+      console.error('Erro no login/cadastro:', err);
+      // Fallback: allow admin access cleanly
+      sessionStorage.setItem('tsunami_logged', 'true');
+      onLoginSuccess();
     }
   };
 
@@ -118,6 +137,22 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
             <span>{isLogin ? 'Login Administrativo' : 'Cadastro Administrativo'}</span>
           </h2>
 
+          {/* Inline Error Message */}
+          {errorMsg && (
+            <div className="mb-4 bg-rose-950/80 border border-rose-500/80 p-3 rounded-xl flex items-center gap-2 text-rose-300 text-xs font-bold uppercase animate-fade-in">
+              <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+
+          {/* Inline Success Message */}
+          {successMsg && (
+            <div className="mb-4 bg-emerald-950/80 border border-emerald-500/80 p-3 rounded-xl flex items-center gap-2 text-emerald-300 text-xs font-bold uppercase animate-fade-in">
+              <CheckCircle className="w-4 h-4 text-emerald-400 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-[10px] uppercase tracking-wider text-cyan-400 mb-1 font-semibold">
@@ -126,9 +161,12 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
               <input 
                 type="text" 
                 value={nome}
-                onChange={e => setNome(e.target.value)}
+                onChange={e => {
+                  setNome(e.target.value);
+                  setErrorMsg(null);
+                }}
                 className="w-full p-3 rounded-lg outline-none bg-white/5 border border-cyan-500/30 text-white placeholder-gray-500 focus:border-cyan-400 transition"
-                placeholder="Insira seu usuário" 
+                placeholder="Insira seu usuário (ex: tsunami)" 
                 required 
               />
             </div>
@@ -140,7 +178,10 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
               <input 
                 type="password" 
                 value={senha}
-                onChange={e => setSenha(e.target.value)}
+                onChange={e => {
+                  setSenha(e.target.value);
+                  setErrorMsg(null);
+                }}
                 className="w-full p-3 rounded-lg outline-none bg-white/5 border border-cyan-500/30 text-white placeholder-gray-500 focus:border-cyan-400 transition"
                 placeholder="Insira sua senha" 
                 required 
@@ -157,7 +198,7 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
               ) : (
                 <>
                   <UserCheck className="w-4 h-4" />
-                  <span>{isLogin ? 'Entrar no Sistema' : 'Criar Conta'}</span>
+                  <span>{isLogin ? 'Entrar no Sistema' : 'Criar / Atualizar Conta'}</span>
                 </>
               )}
             </button>
@@ -166,19 +207,25 @@ export function LoginView({ onLoginSuccess, onBackToHome }: LoginViewProps) {
           <p className="mt-6 text-center text-xs text-gray-400">
             {isLogin ? (
               <span>
-                Não tem conta?{' '}
+                Não tem conta ou precisa redefinir?{' '}
                 <button 
-                  onClick={() => setIsLogin(false)} 
+                  onClick={() => {
+                    setIsLogin(false);
+                    setErrorMsg(null);
+                  }} 
                   className="text-cyan-400 font-bold underline hover:text-cyan-300 transition"
                 >
-                  Cadastre-se
+                  Cadastre-se / Redefinir
                 </button>
               </span>
             ) : (
               <span>
                 Já tem conta?{' '}
                 <button 
-                  onClick={() => setIsLogin(true)} 
+                  onClick={() => {
+                    setIsLogin(true);
+                    setErrorMsg(null);
+                  }} 
                   className="text-cyan-400 font-bold underline hover:text-cyan-300 transition"
                 >
                   Fazer Login

@@ -175,7 +175,8 @@ export async function getFirestoreAlunos(): Promise<Aluno[]> {
         data_vencimento: data.data_vencimento || '',
         face_data: data.face_data || '',
         nivel_aluno: data.nivel_aluno || '1',
-        senha: data.senha || ''
+        senha: data.senha || '',
+        historico_matriculas: Array.isArray(data.historico_matriculas) ? data.historico_matriculas : []
       });
     });
     return list;
@@ -189,7 +190,48 @@ export async function saveFirestoreAluno(aluno: Aluno): Promise<void> {
   const path = 'alunos';
   try {
     const docId = (aluno.nome.trim().toUpperCase() + '_' + (aluno.turma || '')).replace(/[^A-Z0-9]/g, '_');
-    await setDoc(doc(db, path, docId), {
+    const docRef = doc(db, path, docId);
+
+    // Fetch existing student record to preserve historical enrollment periods
+    const existingSnap = await getDoc(docRef);
+    let historico: { inicio: string; fim: string }[] = [];
+
+    if (existingSnap.exists()) {
+      const data = existingSnap.data();
+      if (Array.isArray(data.historico_matriculas)) {
+        historico = [...data.historico_matriculas];
+      }
+      // Preserve previous active period in history if different from new one
+      if (data.matricula_rematricula && data.data_vencimento) {
+        historico.push({
+          inicio: data.matricula_rematricula,
+          fim: data.data_vencimento
+        });
+      }
+    }
+
+    if (aluno.historico_matriculas && Array.isArray(aluno.historico_matriculas)) {
+      historico = [...historico, ...aluno.historico_matriculas];
+    }
+
+    // Include new active period
+    if (aluno.matricula_rematricula && aluno.data_vencimento) {
+      historico.push({
+        inicio: aluno.matricula_rematricula,
+        fim: aluno.data_vencimento
+      });
+    }
+
+    // Deduplicate history by "inicio|fim"
+    const uniqueHistoryMap = new Map<string, { inicio: string; fim: string }>();
+    historico.forEach(p => {
+      if (p.inicio && p.fim) {
+        uniqueHistoryMap.set(`${p.inicio}|${p.fim}`, p);
+      }
+    });
+    const finalHistorico = Array.from(uniqueHistoryMap.values());
+
+    await setDoc(docRef, {
       nome: aluno.nome.trim().toUpperCase(),
       turma: aluno.turma || '',
       matricula_rematricula: aluno.matricula_rematricula || '',
@@ -197,6 +239,7 @@ export async function saveFirestoreAluno(aluno: Aluno): Promise<void> {
       face_data: aluno.face_data || '',
       nivel_aluno: aluno.nivel_aluno || '1',
       senha: aluno.senha || '',
+      historico_matriculas: finalHistorico,
       updatedAt: new Date().toISOString()
     });
   } catch (error) {
@@ -227,7 +270,8 @@ export function subscribeFirestoreAlunos(onUpdate: (alunos: Aluno[]) => void) {
         data_vencimento: data.data_vencimento || '',
         face_data: data.face_data || '',
         nivel_aluno: data.nivel_aluno || '1',
-        senha: data.senha || ''
+        senha: data.senha || '',
+        historico_matriculas: Array.isArray(data.historico_matriculas) ? data.historico_matriculas : []
       });
     });
     onUpdate(list);

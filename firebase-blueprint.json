@@ -24,7 +24,17 @@
         "data_vencimento": { "type": "string" },
         "face_data": { "type": "string" },
         "nivel_aluno": { "type": "string" },
-        "senha": { "type": "string" }
+        "senha": { "type": "string" },
+        "historico_matriculas": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "inicio": { "type": "string" },
+              "fim": { "type": "string" }
+            }
+          }
+        }
       },
       "required": ["nome"]
     },

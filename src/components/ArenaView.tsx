@@ -114,17 +114,54 @@ export function ArenaView({ onBack }: ArenaViewProps) {
   const ativo = (aluno: Aluno, dataISO: string) => {
     const mat = getISOString(aluno.matricula_rematricula);
     const ven = getISOString(aluno.data_vencimento);
-    if (!mat || !ven) return true;
-    return dataISO >= mat && dataISO <= ven;
+    if (mat && ven && dataISO >= mat && dataISO <= ven) return true;
+
+    if (aluno.historico_matriculas && Array.isArray(aluno.historico_matriculas)) {
+      for (const p of aluno.historico_matriculas) {
+        const hMat = getISOString(p.inicio);
+        const hVen = getISOString(p.fim);
+        if (hMat && hVen && dataISO >= hMat && dataISO <= hVen) return true;
+      }
+    }
+
+    if (freq[chave(aluno.nome, dataISO)]) return true;
+    if (!mat && !ven && (!aluno.historico_matriculas || aluno.historico_matriculas.length === 0)) return true;
+
+    return false;
   };
 
   const noMes = (aluno: Aluno, ano: number, mes: number) => {
-    const mat = getISOString(aluno.matricula_rematricula);
-    const ven = getISOString(aluno.data_vencimento);
-    if (!mat || !ven) return true;
     const iniMes = getISOString(new Date(ano, mes, 1))!;
     const fimMes = getISOString(new Date(ano, mes + 1, 0))!;
-    return mat <= fimMes && ven >= iniMes;
+
+    const mat = getISOString(aluno.matricula_rematricula);
+    const ven = getISOString(aluno.data_vencimento);
+    if (mat && ven && mat <= fimMes && ven >= iniMes) return true;
+
+    if (aluno.historico_matriculas && Array.isArray(aluno.historico_matriculas)) {
+      for (const p of aluno.historico_matriculas) {
+        const hMat = getISOString(p.inicio);
+        const hVen = getISOString(p.fim);
+        if (hMat && hVen && hMat <= fimMes && hVen >= iniMes) return true;
+      }
+    }
+
+    const diasMes: string[] = [];
+    let dTemp = new Date(ano, mes, 1);
+    while (dTemp.getMonth() === mes) {
+      if (dTemp.getDay() === 6) {
+        const dStr = getISOString(dTemp);
+        if (dStr) diasMes.push(dStr);
+      }
+      dTemp.setDate(dTemp.getDate() + 1);
+    }
+    for (const d of diasMes) {
+      if (freq[chave(aluno.nome, d)]) return true;
+    }
+
+    if (!mat && !ven && (!aluno.historico_matriculas || aluno.historico_matriculas.length === 0)) return true;
+
+    return false;
   };
 
   const limparHora = (valor: any) => {

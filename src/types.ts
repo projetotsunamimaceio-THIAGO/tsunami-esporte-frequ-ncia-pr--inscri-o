@@ -6,6 +6,11 @@ export interface Turma {
   dias: string;
 }
 
+export interface PeriodoMatricula {
+  inicio: string;
+  fim: string;
+}
+
 export interface Aluno {
   nome: string;
   turma: string;
@@ -14,6 +19,7 @@ export interface Aluno {
   face_data?: string;
   nivel_aluno?: string;
   senha?: string;
+  historico_matriculas?: PeriodoMatricula[];
 }
 
 export interface User {

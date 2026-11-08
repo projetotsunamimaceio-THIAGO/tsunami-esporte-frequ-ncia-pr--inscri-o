@@ -61,8 +61,20 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
   const ativo = (aluno: Aluno, dataISO: string) => {
     const mat = getISOString(aluno.matricula_rematricula);
     const ven = getISOString(aluno.data_vencimento);
-    if (!mat || !ven) return true;
-    return dataISO >= mat && dataISO <= ven;
+    if (mat && ven && dataISO >= mat && dataISO <= ven) return true;
+
+    if (aluno.historico_matriculas && Array.isArray(aluno.historico_matriculas)) {
+      for (const p of aluno.historico_matriculas) {
+        const hMat = getISOString(p.inicio);
+        const hVen = getISOString(p.fim);
+        if (hMat && hVen && dataISO >= hMat && dataISO <= hVen) return true;
+      }
+    }
+
+    if (freq[chave(aluno.nome, dataISO)]) return true;
+    if (!mat && !ven && (!aluno.historico_matriculas || aluno.historico_matriculas.length === 0)) return true;
+
+    return false;
   };
 
   // Camera & Scan Animation State
