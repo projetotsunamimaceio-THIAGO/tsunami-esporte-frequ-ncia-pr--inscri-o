@@ -516,14 +516,30 @@ export async function saveFirestoreInscricaoEsporte(inscricao: InscricaoEsporte)
   const path = 'inscricoes_esporte';
   try {
     const docId = (inscricao.alunoNome.trim().toUpperCase() + '_' + (inscricao.data || new Date().toISOString().split('T')[0])).replace(/[^A-Z0-9]/g, '_');
-    await setDoc(doc(db, path, docId), {
+    const docRef = doc(db, path, docId);
+    
+    // Preserve original creation timestamp if document exists
+    let criadoEm = inscricao.criadoEm || new Date().toISOString();
+    try {
+      const existingSnap = await getDoc(docRef);
+      if (existingSnap.exists()) {
+        const existingData = existingSnap.data();
+        if (existingData.criadoEm) {
+          criadoEm = existingData.criadoEm;
+        }
+      }
+    } catch (e) {
+      // Ignore if check fails
+    }
+
+    await setDoc(docRef, {
       alunoNome: inscricao.alunoNome.trim().toUpperCase(),
       turma: inscricao.turma || '',
       data: inscricao.data || new Date().toISOString().split('T')[0],
       celulaConfirmada: inscricao.celulaConfirmada !== false,
       celulaHora: inscricao.celulaHora || '',
       turmasSelecionadas: inscricao.turmasSelecionadas || [],
-      criadoEm: inscricao.criadoEm || new Date().toISOString()
+      criadoEm: criadoEm
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, path);
@@ -547,6 +563,14 @@ export function subscribeFirestoreInscricoesEsporte(onUpdate: (list: InscricaoEs
         criadoEm: data.criadoEm || ''
       });
     });
+
+    // Ordenar por ordem de chegada (criadoEm ascendente: mais antigos primeiro)
+    list.sort((a, b) => {
+      const tA = a.criadoEm ? new Date(a.criadoEm).getTime() : 0;
+      const tB = b.criadoEm ? new Date(b.criadoEm).getTime() : 0;
+      return tA - tB;
+    });
+
     onUpdate(list);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, path);

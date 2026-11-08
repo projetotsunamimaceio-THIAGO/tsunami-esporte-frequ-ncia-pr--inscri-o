@@ -120,15 +120,35 @@ export function ListaInscricaoSection() {
             const isCelula = act.isFixa || act.id === 'celula_fixa' || act.titulo.toUpperCase().includes('CÉLULA') || act.titulo.toUpperCase().includes('CELULA');
             const vagasTotais = isCelula ? 100 : getVagasPadrao(act);
             
-            // Alunos inscritos nesta aula
-            const inscritos = inscricoesList
+            // Alunos inscritos nesta aula ordenados por ordem de chegada (criadoEm ascendente)
+            const inscritosComTimestamp = inscricoesList
               .filter(i => isCelula ? (i.celulaConfirmada !== false) : (i.turmasSelecionadas && i.turmasSelecionadas.includes(act.titulo)))
-              .map(i => i.alunoNome.toUpperCase());
+              .sort((a, b) => {
+                const tA = a.criadoEm ? new Date(a.criadoEm).getTime() : 0;
+                const tB = b.criadoEm ? new Date(b.criadoEm).getTime() : 0;
+                return tA - tB;
+              });
 
-            const inscritosUnicos = [...new Set(inscritos)];
+            // Deduplica mantendo a primeira ocorrência (a mais antiga)
+            const nomesVistos = new Set<string>();
+            const inscritosUnicos: { nome: string; turma: string; criadoEm: string }[] = [];
+            inscritosComTimestamp.forEach(i => {
+              const key = i.alunoNome.trim().toUpperCase();
+              if (!nomesVistos.has(key)) {
+                nomesVistos.add(key);
+                inscritosUnicos.push({
+                  nome: i.alunoNome.toUpperCase(),
+                  turma: i.turma || '',
+                  criadoEm: i.criadoEm || ''
+                });
+              }
+            });
+
             const countInscritos = inscritosUnicos.length;
+            const confirmados = inscritosUnicos.slice(0, vagasTotais);
+            const emEsperaLista = !isCelula && countInscritos > vagasTotais ? inscritosUnicos.slice(vagasTotais) : [];
+            const emEspera = emEsperaLista.length;
             const vagasRestantes = isCelula ? Math.max(0, 100 - countInscritos) : Math.max(0, vagasTotais - countInscritos);
-            const emEspera = !isCelula && countInscritos > vagasTotais ? (countInscritos - vagasTotais) : 0;
             const percentual = isCelula ? Math.min(100, Math.round((countInscritos / 100) * 100)) : Math.min(100, Math.round((countInscritos / vagasTotais) * 100));
 
             return (
@@ -217,7 +237,7 @@ export function ListaInscricaoSection() {
                 </div>
 
                 {/* Inner Box with Registered Students */}
-                <div className={`border border-dashed rounded-2xl p-4 ${
+                <div className={`border border-dashed rounded-2xl p-4 space-y-4 ${
                   isCelula 
                     ? 'bg-black/50 border-amber-500/30' 
                     : emEspera > 0
@@ -236,56 +256,83 @@ export function ListaInscricaoSection() {
                       </span>
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between border-b border-white/10 pb-2">
-                        <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${isCelula ? 'text-amber-300' : emEspera > 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                          <Users className="w-3.5 h-3.5" />
-                          <span>INSCRITOS CONFIRMADOS ({countInscritos}):</span>
-                        </span>
-                        <span className={`px-2.5 py-0.5 border rounded-md text-[10px] font-black uppercase ${
-                          isCelula 
-                            ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' 
-                            : emEspera > 0
-                            ? 'bg-rose-500/20 border-rose-500/60 text-rose-300'
-                            : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
-                        }`}>
-                          {isCelula ? 'PRESENÇA REGISTRADA' : emEspera > 0 ? `⚠️ ${emEspera} EM ESPERA` : `${vagasRestantes} VAGAS LIVRES`}
-                        </span>
-                      </div>
+                    <div className="space-y-4">
+                      {/* VAGAS CONFIRMADAS */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between border-b border-white/10 pb-2">
+                          <span className={`text-xs font-black uppercase tracking-wider flex items-center gap-1.5 ${isCelula ? 'text-amber-300' : 'text-emerald-400'}`}>
+                            <Users className="w-3.5 h-3.5" />
+                            <span>VAGAS CONFIRMADAS (ORDEM DE CHEGADA - {confirmados.length}/{vagasTotais}):</span>
+                          </span>
+                          <span className={`px-2.5 py-0.5 border rounded-md text-[10px] font-black uppercase ${
+                            isCelula 
+                              ? 'bg-amber-500/15 border-amber-500/40 text-amber-300' 
+                              : 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                          }`}>
+                            {isCelula ? 'PRESENÇA REGISTRADA' : `${vagasRestantes} VAGAS LIVRES`}
+                          </span>
+                        </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                        {inscritosUnicos.map((nome, idx) => {
-                          const excedeVagas = !isCelula && idx >= vagasTotais;
-                          return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                          {confirmados.map((item, idx) => (
                             <div 
                               key={idx}
                               className={`p-2 rounded-xl border font-extrabold text-xs uppercase flex items-center gap-2 ${
                                 isCelula
                                   ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
-                                  : excedeVagas
-                                  ? 'bg-rose-950/80 border-rose-500/80 text-rose-300 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse'
                                   : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
                               }`}
                             >
                               <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-mono shrink-0 ${
                                 isCelula 
                                   ? 'bg-amber-500/20 border-amber-400 text-amber-300' 
-                                  : excedeVagas
-                                  ? 'bg-rose-500/30 border-rose-400 text-rose-200'
                                   : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
                               }`}>
                                 {idx + 1}
                               </span>
-                              <span className="truncate flex-1">{nome}</span>
-                              {excedeVagas && (
-                                <span className="text-[9px] font-black uppercase text-rose-300 bg-rose-500/30 px-1.5 py-0.5 rounded border border-rose-400/60 shrink-0">
-                                  ⏳ ESPERA
-                                </span>
-                              )}
+                              <span className="truncate flex-1">{item.nome}</span>
+                              <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
+                                CONFIRMADO
+                              </span>
                             </div>
-                          );
-                        })}
+                          ))}
+                        </div>
                       </div>
+
+                      {/* LISTA DE ESPERA (COLOCADA ABAIXO DOS NOMES CONFIRMADOS) */}
+                      {emEspera > 0 && (
+                        <div className="space-y-2 pt-3 border-t border-rose-500/40">
+                          <div className="flex items-center justify-between pb-1">
+                            <span className="text-xs font-black uppercase tracking-wider flex items-center gap-1.5 text-rose-300 font-chakra">
+                              ⚠️ LISTA DE ESPERA - ORDEM DE CHEGADA ({emEspera} ALUNO{emEspera > 1 ? 'S' : ''}):
+                            </span>
+                            <span className="bg-rose-500/20 border border-rose-500/60 text-rose-300 px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase font-mono">
+                              AGUARDANDO DESISTÊNCIA
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                            {emEsperaLista.map((item, idx) => {
+                              const posicaoGeral = vagasTotais + idx + 1;
+                              const posicaoFila = idx + 1;
+                              return (
+                                <div 
+                                  key={idx}
+                                  className="p-2 rounded-xl border bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)] flex items-center gap-2"
+                                >
+                                  <span className="w-5 h-5 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[10px] font-mono font-black text-rose-200 shrink-0">
+                                    {posicaoGeral}
+                                  </span>
+                                  <span className="truncate flex-1 font-extrabold text-xs uppercase">{item.nome}</span>
+                                  <span className="text-[9px] font-black uppercase text-rose-200 bg-rose-500/40 px-2 py-0.5 rounded border border-rose-400/80 shrink-0">
+                                    ⏳ {posicaoFila}º NA FILA
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

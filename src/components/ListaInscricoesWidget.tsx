@@ -62,12 +62,18 @@ export function ListaInscricoesWidget() {
     };
   }, []);
 
-  // Obter inscritos em cada atividade específica (esporte ou célula)
+  // Obter inscritos em cada atividade específica (esporte ou célula) ordenados por ordem de chegada
   const getInscritosPorAtividade = (tituloAtividade: string, isCelula: boolean) => {
-    const inscritosUnicos: { nome: string; turma: string }[] = [];
+    const sortedInscricoes = [...inscricoes].sort((a, b) => {
+      const tA = a.criadoEm ? new Date(a.criadoEm).getTime() : 0;
+      const tB = b.criadoEm ? new Date(b.criadoEm).getTime() : 0;
+      return tA - tB;
+    });
+
+    const inscritosUnicos: { nome: string; turma: string; criadoEm: string }[] = [];
     const nomesVistos = new Set<string>();
 
-    inscricoes.forEach(ins => {
+    sortedInscricoes.forEach(ins => {
       const bateuAtividade = isCelula
         ? (ins.celulaConfirmada !== false)
         : (ins.turmasSelecionadas && ins.turmasSelecionadas.includes(tituloAtividade));
@@ -78,7 +84,8 @@ export function ListaInscricoesWidget() {
           nomesVistos.add(key);
           inscritosUnicos.push({
             nome: ins.alunoNome,
-            turma: ins.turma || ''
+            turma: ins.turma || '',
+            criadoEm: ins.criadoEm || ''
           });
         }
       }
@@ -155,8 +162,10 @@ export function ListaInscricoesWidget() {
             const vagasTotais = isCelula ? 100 : (act.vagas || 15);
             const inscritos = getInscritosPorAtividade(act.titulo, isCelula);
             const qtdInscritos = inscritos.length;
+            const confirmados = inscritos.slice(0, vagasTotais);
+            const emEsperaLista = !isCelula && qtdInscritos > vagasTotais ? inscritos.slice(vagasTotais) : [];
+            const emEspera = emEsperaLista.length;
             const vagasRestantes = isCelula ? Math.max(0, 100 - qtdInscritos) : Math.max(0, vagasTotais - qtdInscritos);
-            const emEspera = !isCelula && qtdInscritos > vagasTotais ? (qtdInscritos - vagasTotais) : 0;
             const porcentagem = isCelula ? Math.min(100, Math.round((qtdInscritos / 100) * 100)) : Math.min(100, Math.round((qtdInscritos / vagasTotais) * 100));
 
             return (
@@ -247,7 +256,7 @@ export function ListaInscricoesWidget() {
                 </div>
 
                 {/* Inner Enrolled Students Box */}
-                <div className={`border border-dashed rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                <div className={`border border-dashed rounded-xl p-4 space-y-4 ${
                   isCelula 
                     ? 'bg-black/50 border-amber-500/40' 
                     : emEspera > 0
@@ -259,34 +268,63 @@ export function ListaInscricoesWidget() {
                       NENHUM ALUNO CONFIRMADO AINDA
                     </div>
                   ) : (
-                    <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
-                      {inscritos.map((aluno, i) => {
-                        const excedeVagas = !isCelula && i >= vagasTotais;
-                        return (
-                          <span 
-                            key={i}
-                            className={`px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 ${
-                              isCelula
-                                ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
-                                : excedeVagas
-                                ? 'bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)] animate-pulse'
-                                : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
-                            }`}
-                          >
-                            <span className={`w-1.5 h-1.5 rounded-full ${isCelula ? 'bg-amber-400' : excedeVagas ? 'bg-rose-400' : 'bg-emerald-400'}`}></span>
-                            <span>{aluno.nome}</span>
-                            {excedeVagas && (
-                              <span className="text-[9px] font-black uppercase text-rose-300 bg-rose-500/30 px-1.5 py-0.5 rounded border border-rose-400/60 ml-1">
-                                ⏳ LISTA DE ESPERA
+                    <div className="space-y-4">
+                      {/* VAGAS CONFIRMADAS */}
+                      <div className="space-y-2">
+                        <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
+                          VAGAS CONFIRMADAS (ORDEM DE CHEGADA - {confirmados.length}/{vagasTotais}):
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
+                          {confirmados.map((aluno, i) => (
+                            <span 
+                              key={i}
+                              className={`px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 ${
+                                isCelula
+                                  ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
+                                  : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
+                              }`}
+                            >
+                              <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-mono shrink-0 ${isCelula ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'}`}>
+                                {i + 1}
                               </span>
-                            )}
-                          </span>
-                        );
-                      })}
+                              <span>{aluno.nome}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* LISTA DE ESPERA (COLOCADA ABAIXO DOS NOMES CONFIRMADOS) */}
+                      {emEspera > 0 && (
+                        <div className="space-y-2 pt-3 border-t border-rose-500/40">
+                          <div className="text-[10px] font-black uppercase text-rose-300 tracking-wider">
+                            ⚠️ LISTA DE ESPERA - ORDEM DE CHEGADA ({emEspera} ALUNO{emEspera > 1 ? 'S' : ''}):
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
+                            {emEsperaLista.map((aluno, i) => {
+                              const posFila = i + 1;
+                              const posGeral = vagasTotais + i + 1;
+                              return (
+                                <span 
+                                  key={i}
+                                  className="px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                                >
+                                  <span className="w-4 h-4 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[9px] font-mono text-rose-200 shrink-0 font-bold">
+                                    {posGeral}
+                                  </span>
+                                  <span>{aluno.nome}</span>
+                                  <span className="text-[9px] font-black uppercase text-rose-200 bg-rose-500/40 px-1.5 py-0.5 rounded border border-rose-400/80 ml-1">
+                                    ⏳ {posFila}º NA FILA
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
 
-                  <div className="shrink-0 text-right">
+                  <div className="shrink-0 text-right pt-1">
                     <span className={`px-3 py-1 font-extrabold text-xs uppercase rounded-lg inline-block border ${
                       isCelula
                         ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
