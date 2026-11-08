@@ -250,7 +250,7 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
 
     alunos.forEach(a => {
       const key = a.nome.trim().toUpperCase();
-      statsMap[key] = { nomeOriginal: a.nome, turma: a.turma || 'S/T', P: 0, A: 0, J: 0, F: 0, chegadas: [] };
+      statsMap[key] = { nomeOriginal: a.nome, turma: a.turma || '', P: 0, A: 0, J: 0, F: 0, chegadas: [] };
     });
 
     Object.entries(freq).forEach(([chave, status]) => {
@@ -265,7 +265,8 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
       if (!periodos.some(p => p.mes === mData && p.ano === aData)) return;
 
       if (!statsMap[nomeRaw]) {
-        statsMap[nomeRaw] = { nomeOriginal: nomeRaw, turma: 'S/T', P: 0, A: 0, J: 0, F: 0, chegadas: [] };
+        const alunoEncontrado = alunos.find(a => a.nome.trim().toUpperCase() === nomeRaw);
+        statsMap[nomeRaw] = { nomeOriginal: alunoEncontrado ? alunoEncontrado.nome : nomeRaw, turma: alunoEncontrado?.turma || '', P: 0, A: 0, J: 0, F: 0, chegadas: [] };
       }
 
       const s = (status || '').toUpperCase();
@@ -274,10 +275,12 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
         if (s === 'A') statsMap[nomeRaw].A++;
         const hora = ordens[chave];
         if (hora && typeof hora === 'string') {
-          const match = hora.match(/(\d{1,2}):(\d{2})/);
+          const match = hora.match(/(\d{1,2}):(\d{2})(?::(\d{2}))?/);
           if (match) {
-            const h = parseInt(match[1]), min = parseInt(match[2]);
-            if (!isNaN(h) && !isNaN(min)) statsMap[nomeRaw].chegadas.push(h * 60 + min);
+            const h = parseInt(match[1]), min = parseInt(match[2]), seg = match[3] ? parseInt(match[3]) : 0;
+            if (!isNaN(h) && !isNaN(min) && !isNaN(seg)) {
+              statsMap[nomeRaw].chegadas.push(h * 3600 + min * 60 + seg);
+            }
           }
         }
       } else if (s === 'J') statsMap[nomeRaw].J++;
@@ -285,14 +288,18 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
     });
 
     const lista = Object.values(statsMap)
-      .filter(a => a.P + a.A + a.J + a.F > 0)
+      .filter(a => {
+        const t = (a.turma || '').trim().toUpperCase();
+        if (!t || t === 'S/T' || t === 'SEM TURMA') return false;
+        return a.P + a.A + a.J + a.F > 0;
+      })
       .map(a => {
         const totalC = a.chegadas.length;
-        const mediaMin = totalC > 0 ? Math.round(a.chegadas.reduce((s: number, v: number) => s + v, 0) / totalC) : null;
+        const mediaSeg = totalC > 0 ? Math.round(a.chegadas.reduce((s: number, v: number) => s + v, 0) / totalC) : null;
         return {
           ...a,
           pontos: a.P * PTS_SISTEMA.P + a.A * PTS_SISTEMA.A + a.J * PTS_SISTEMA.J + a.F * PTS_SISTEMA.F,
-          mediaChegada: mediaMin,
+          mediaChegada: mediaSeg,
           qAluno: a.P + a.A + a.J + a.F
         };
       })
@@ -317,8 +324,10 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
   const minPts = Math.min(...listaPontos.map(a => a.pontos), 0);
   const range = (maxPts - minPts) || 1;
 
-  // Compute rankings
+  // Compute rankings (excluding S/T)
   const listaIndividuais = Object.values(alunos.reduce((acc: Record<string, any>, a) => {
+    const t = (a.turma || '').trim().toUpperCase();
+    if (!t || t === 'S/T' || t === 'SEM TURMA') return acc;
     const key = a.nome.trim().toUpperCase();
     let P = 0, F = 0;
     Object.entries(freq).forEach(([k, s]) => {
@@ -558,9 +567,14 @@ export function RelatorioView({ onBack }: RelatorioViewProps) {
                     const pos = i + 1;
                     const medals: Record<number, string> = { 1: '🥇', 2: '🥈', 3: '🥉' };
                     const pct = Math.max(0, ((a.pontos - minPts) / range) * 100);
-                    const horaFormatada = a.mediaChegada !== null 
-                      ? `${String(Math.floor(a.mediaChegada / 60)).padStart(2, '0')}:${String(a.mediaChegada % 60).padStart(2, '0')}` 
-                      : '—';
+                    const formatarMediaSegundos = (segTotal: number | null): string => {
+                      if (segTotal === null) return '—';
+                      const h = String(Math.floor(segTotal / 3600)).padStart(2, '0');
+                      const m = String(Math.floor((segTotal % 3600) / 60)).padStart(2, '0');
+                      const s = String(segTotal % 60).padStart(2, '0');
+                      return `${h}:${m}:${s}`;
+                    };
+                    const horaFormatada = formatarMediaSegundos(a.mediaChegada);
 
                     return (
                       <tr key={i} className="border-b border-white/5 hover:bg-white/[0.02]">
