@@ -24,6 +24,7 @@ import {
   subscribeFirestorePermissoesEsporte,
   subscribeFirestoreInscricoesEsporte,
   saveFirestoreInscricaoEsporte,
+  deleteFirestoreInscricaoEsporte,
   saveFirestoreFrequencia,
   subscribeFirestoreConfiguracaoEsporte
 } from '../lib/firestoreService';
@@ -57,6 +58,7 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
   const [celulaConfirmada, setCelulaConfirmada] = useState<boolean>(true);
   const [turmasSelecionadas, setTurmasSelecionadas] = useState<string[]>([]);
   const [inscricaoConcluida, setInscricaoConcluida] = useState<boolean>(false);
+  const [mensagemSucesso, setMensagemSucesso] = useState<string>('');
 
   // Modal Sorteio de Linhas
   const [sorteioModal, setSorteioModal] = useState<{ open: boolean; titulo: string; inscritos: string[] }>({
@@ -208,6 +210,9 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     setJustificativaEnviada(false);
   };
 
+  const normalizeNome = (str: string) => 
+    (str || '').trim().toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
   // Selecionar Aluno
   const handleSelectAluno = (aluno: Aluno) => {
     setSelectedAluno(aluno);
@@ -215,8 +220,9 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     setSenhaErro('');
 
     // Se o aluno já tiver uma inscrição salva, carregar suas escolhas atuais
+    const targetNorm = normalizeNome(aluno.nome);
     const inscricaoExistente = inscricoesList.find(
-      i => i.alunoNome.trim().toUpperCase() === aluno.nome.trim().toUpperCase()
+      i => !i.convidadoDe && normalizeNome(i.alunoNome) === targetNorm
     );
 
     if (inscricaoExistente) {
@@ -261,22 +267,73 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
     }
   };
 
-  // Concluir Pré Inscrição
+  // Desmarcar / Cancelar Inscrição completamente
+  const handleDesmarcarTudo = async () => {
+    if (!selectedAluno) return;
+
+    const targetNorm = normalizeNome(selectedAluno.nome);
+    const matchingInscricoes = inscricoesList.filter(
+      i => !i.convidadoDe && normalizeNome(i.alunoNome) === targetNorm
+    );
+
+    for (const insc of matchingInscricoes) {
+      await deleteFirestoreInscricaoEsporte(insc.id);
+    }
+
+    setCelulaConfirmada(false);
+    setTurmasSelecionadas([]);
+    setMensagemSucesso('INSCRIÇÃO DESMARCADA COM SUCESSO! Sua vaga na Célula e nas atividades foi liberada.');
+    setInscricaoConcluida(true);
+    setStep(5);
+  };
+
+  // Concluir / Atualizar Pré Inscrição
   const handleConcluirInscricao = async () => {
     if (!selectedAluno) return;
 
+    const targetNorm = normalizeNome(selectedAluno.nome);
+    const matchingInscricoes = inscricoesList.filter(
+      i => !i.convidadoDe && normalizeNome(i.alunoNome) === targetNorm
+    );
+
+    // Se desmarcou Célula, remove a inscrição completamente do banco
+    if (!celulaConfirmada) {
+      for (const insc of matchingInscricoes) {
+        await deleteFirestoreInscricaoEsporte(insc.id);
+      }
+      setMensagemSucesso('INSCRIÇÃO DESMARCADA COM SUCESSO! Sua vaga na Célula e nas atividades foi liberada.');
+      setInscricaoConcluida(true);
+      setStep(5);
+      return;
+    }
+
+    // Se possui inscrição existente, reaproveita o ID e a data de criação original (para não perder a ordem de chegada)
+    const existingDoc = matchingInscricoes[0];
+    const docIdToUse = existingDoc?.id || (
+      selectedAluno.nome.trim().toUpperCase() + '_' + new Date().toISOString().split('T')[0]
+    ).replace(/[^A-Z0-9]/g, '_');
+
     const novaInscricao: InscricaoEsporte = {
-      id: 'insc_' + Date.now(),
+      id: docIdToUse,
       alunoNome: selectedAluno.nome,
       turma: selectedAluno.turma || '',
       data: new Date().toISOString().split('T')[0],
-      celulaConfirmada: celulaConfirmada,
+      celulaConfirmada: true,
       celulaHora: celulaItem.hora || '19:45',
-      turmasSelecionadas: celulaConfirmada ? turmasSelecionadas : [],
-      criadoEm: new Date().toISOString()
+      turmasSelecionadas: turmasSelecionadas,
+      criadoEm: existingDoc?.criadoEm || new Date().toISOString()
     };
 
     await saveFirestoreInscricaoEsporte(novaInscricao);
+
+    // Limpar quaisquer documentos duplicados antigos do mesmo aluno
+    if (matchingInscricoes.length > 1) {
+      for (let i = 1; i < matchingInscricoes.length; i++) {
+        await deleteFirestoreInscricaoEsporte(matchingInscricoes[i].id);
+      }
+    }
+
+    setMensagemSucesso('INSCRIÇÃO SALVA COM SUCESSO! Suas escolhas foram registradas.');
     setInscricaoConcluida(true);
     setStep(5); // Tela de Sucesso
   };
@@ -754,33 +811,43 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                     </button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setStep(2)}
-                      className="p-3.5 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-bold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
-                    >
-                      VOLTAR
-                    </button>
+                  {celulaConfirmada ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        className="p-3.5 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-bold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
+                      >
+                        VOLTAR
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!celulaConfirmada) {
-                          alert('⚠️ PRESENÇA NA CÉLULA OBRIGATÓRIA!\n\nVocê desmarcou a presença na Célula Evangelística Tsunami.\n\nPara poder se inscrever e jogar nas turmas esportivas, é obrigatório confirmar presença na Célula.');
-                          return;
-                        }
-                        setStep(4);
-                      }}
-                      className={`p-3.5 rounded-2xl font-black uppercase text-xs transition cursor-pointer shadow-[0_0_20px_rgba(234,179,8,0.4)] ${
-                        celulaConfirmada
-                          ? 'bg-yellow-400 hover:bg-yellow-300 text-black'
-                          : 'bg-gray-800 text-gray-400 border border-gray-700 hover:bg-gray-700'
-                      }`}
-                    >
-                      AVANÇAR PARA AULAS
-                    </button>
-                  </div>
+                      <button
+                        type="button"
+                        onClick={() => setStep(4)}
+                        className="p-3.5 rounded-2xl bg-yellow-400 hover:bg-yellow-300 text-black font-black uppercase text-xs transition cursor-pointer shadow-[0_0_20px_rgba(234,179,8,0.4)] flex items-center justify-center gap-1.5"
+                      >
+                        <span>AVANÇAR PARA AULAS ›</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={handleDesmarcarTudo}
+                        className="w-full p-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black uppercase text-xs tracking-wider transition cursor-pointer shadow-[0_0_20px_rgba(244,63,94,0.5)] flex items-center justify-center gap-2"
+                      >
+                        <span>CONCLUIR E DESMARCAR INSCRIÇÃO ✓</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setStep(2)}
+                        className="w-full p-3 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-bold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
+                      >
+                        VOLTAR
+                      </button>
+                    </div>
+                  )}
                 </div>
 
               </div>
@@ -938,21 +1005,31 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                   </div>
 
                   {/* Buttons */}
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-2">
-                    <button
-                      type="button"
-                      onClick={() => setStep(3)}
-                      className="md:col-span-4 p-4 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-extrabold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
-                    >
-                      VOLTAR
-                    </button>
+                  <div className="space-y-3 pt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setStep(3)}
+                        className="md:col-span-4 p-4 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-extrabold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
+                      >
+                        VOLTAR
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleConcluirInscricao}
+                        className="md:col-span-8 p-4 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-black uppercase text-sm tracking-wider transition cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2"
+                      >
+                        <span>CONCLUIR INSCRIÇÃO ✓</span>
+                      </button>
+                    </div>
 
                     <button
                       type="button"
-                      onClick={handleConcluirInscricao}
-                      className="md:col-span-8 p-4 rounded-2xl bg-cyan-400 hover:bg-cyan-300 text-black font-black uppercase text-sm tracking-wider transition cursor-pointer shadow-[0_0_25px_rgba(6,182,212,0.5)] flex items-center justify-center gap-2"
+                      onClick={handleDesmarcarTudo}
+                      className="w-full p-3.5 rounded-2xl bg-rose-950/60 border border-rose-500/60 text-rose-300 hover:bg-rose-600 hover:text-white font-black uppercase text-xs tracking-wider transition cursor-pointer flex items-center justify-center gap-2"
                     >
-                      <span>CONCLUIR INSCRIÇÃO ✓</span>
+                      <span>DESMARCAR INSCRIÇÃO E LIBERAR VAGA 🗑️</span>
                     </button>
                   </div>
 
@@ -1042,9 +1119,11 @@ export function EsporteView({ onBackToHome }: EsporteViewProps) {
                     {mode === 'pre-inscricao' ? 'INSCRIÇÃO CONCLUÍDA!' : 'JUSTIFICATIVA ENVIADA!'}
                   </h3>
                   <p className="text-xs text-gray-300 uppercase tracking-widest mt-2">
-                    {mode === 'pre-inscricao'
-                      ? `Atletas pré-inscritos com sucesso para a Célula e modalidades esportivas.`
-                      : `Sua justificativa de ausência foi registrada com sucesso.`}
+                    {mensagemSucesso || (
+                      mode === 'pre-inscricao'
+                        ? `Atletas pré-inscritos com sucesso para a Célula e modalidades esportivas.`
+                        : `Sua justificativa de ausência foi registrada com sucesso.`
+                    )}
                   </p>
                 </div>
 
