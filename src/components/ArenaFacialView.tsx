@@ -559,33 +559,6 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                 </>
               )}
 
-              {/* Center Target Crosshair */}
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
-                <div className="w-16 h-16 border border-emerald-400/50 rounded-full flex items-center justify-center">
-                  <div className="w-2 h-2 bg-emerald-400 rounded-full" />
-                </div>
-              </div>
-
-              {/* SVG Facial Mesh Landmark Overlay */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 z-20" viewBox="0 0 320 240">
-                <g stroke="#10b981" strokeWidth="0.9" opacity="0.75">
-                  <line x1="120" y1="80" x2="160" y2="110"/>
-                  <line x1="200" y1="80" x2="160" y2="110"/>
-                  <line x1="160" y1="110" x2="140" y2="140"/>
-                  <line x1="160" y1="110" x2="180" y2="140"/>
-                  <line x1="140" y1="140" x2="115" y2="170"/>
-                  <line x1="180" y1="140" x2="205" y2="170"/>
-                  <line x1="140" y1="140" x2="180" y2="140"/>
-                </g>
-                <g fill="#34d399">
-                  <circle cx="120" cy="80" r="3" />
-                  <circle cx="200" cy="80" r="3" />
-                  <circle cx="160" cy="110" r="3.5" className="animate-pulse" />
-                  <circle cx="140" cy="140" r="2.5" />
-                  <circle cx="180" cy="140" r="2.5" />
-                </g>
-              </svg>
-
               {/* Top Banner inside camera view */}
               <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 border border-emerald-400/60 px-3 py-1 rounded-lg z-30 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
                 <span className="text-[10px] font-black uppercase text-emerald-300 tracking-widest font-mono">
