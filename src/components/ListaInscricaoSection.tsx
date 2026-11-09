@@ -277,25 +277,31 @@ export function ListaInscricaoSection() {
                           </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
+                        <div className="flex flex-col gap-1.5">
                           {confirmados.map((item, idx) => (
                             <div 
                               key={idx}
-                              className={`p-2 rounded-xl border font-extrabold text-xs uppercase flex items-center gap-2 ${
+                              className={`p-2 px-3 rounded-xl border font-bold text-xs uppercase flex items-center justify-between gap-2 ${
                                 isCelula
                                   ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
                                   : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-300'
                               }`}
                             >
-                              <span className={`w-5 h-5 rounded-full border flex items-center justify-center text-[10px] font-mono shrink-0 ${
+                              <div className="flex items-center gap-2.5 truncate">
+                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-mono shrink-0 ${
+                                  isCelula 
+                                    ? 'bg-amber-500/20 border-amber-400 text-amber-300' 
+                                    : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                                }`}>
+                                  {idx + 1}
+                                </span>
+                                <span className="truncate tracking-tight font-extrabold">{item.nome}</span>
+                              </div>
+                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
                                 isCelula 
-                                  ? 'bg-amber-500/20 border-amber-400 text-amber-300' 
-                                  : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'
+                                  ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                                  : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
                               }`}>
-                                {idx + 1}
-                              </span>
-                              <span className="truncate flex-1">{item.nome}</span>
-                              <span className="text-[9px] font-mono font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20">
                                 CONFIRMADO
                               </span>
                             </div>
@@ -315,19 +321,21 @@ export function ListaInscricaoSection() {
                             </span>
                           </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto pr-1">
+                          <div className="flex flex-col gap-1.5">
                             {emEsperaLista.map((item, idx) => {
                               const posicaoGeral = vagasTotais + idx + 1;
                               const posicaoFila = idx + 1;
                               return (
                                 <div 
                                   key={idx}
-                                  className="p-2 rounded-xl border bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)] flex items-center gap-2"
+                                  className="p-2 px-3 rounded-xl border bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)] flex items-center justify-between gap-2 font-bold text-xs uppercase"
                                 >
-                                  <span className="w-5 h-5 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[10px] font-mono font-black text-rose-200 shrink-0">
-                                    {posicaoGeral}
-                                  </span>
-                                  <span className="truncate flex-1 font-extrabold text-xs uppercase">{item.nome}</span>
+                                  <div className="flex items-center gap-2.5 truncate">
+                                    <span className="w-4 h-4 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[9px] font-mono font-black text-rose-200 shrink-0">
+                                      {posicaoGeral}
+                                    </span>
+                                    <span className="truncate tracking-tight font-extrabold">{item.nome}</span>
+                                  </div>
                                   <span className="text-[9px] font-black uppercase text-rose-200 bg-rose-500/40 px-2 py-0.5 rounded border border-rose-400/80 shrink-0">
                                     ⏳ {posicaoFila}º NA FILA
                                   </span>

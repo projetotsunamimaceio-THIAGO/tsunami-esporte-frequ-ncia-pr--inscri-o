@@ -287,21 +287,30 @@ export function ListaInscricoesWidget() {
                         <div className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">
                           VAGAS CONFIRMADAS (ORDEM DE CHEGADA - {confirmados.length}/{vagasTotais}):
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
+                        <div className="flex flex-col gap-1.5">
                           {confirmados.map((aluno, i) => (
-                            <span 
+                            <div 
                               key={i}
-                              className={`px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 ${
+                              className={`p-2 px-3 rounded-xl border font-bold text-xs uppercase flex items-center justify-between gap-2 ${
                                 isCelula
-                                  ? 'bg-amber-500/15 border-amber-400/50 text-amber-200'
-                                  : 'bg-emerald-500/15 border-emerald-400/50 text-emerald-200'
+                                  ? 'bg-amber-950/40 border-amber-500/30 text-amber-200'
+                                  : 'bg-emerald-950/40 border-emerald-500/30 text-emerald-200'
                               }`}
                             >
-                              <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-mono shrink-0 ${isCelula ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'}`}>
-                                {i + 1}
+                              <div className="flex items-center gap-2.5 truncate">
+                                <span className={`w-4 h-4 rounded-full border flex items-center justify-center text-[9px] font-mono shrink-0 ${isCelula ? 'bg-amber-500/20 border-amber-400 text-amber-300' : 'bg-emerald-500/20 border-emerald-400 text-emerald-300'}`}>
+                                  {i + 1}
+                                </span>
+                                <span className="truncate tracking-tight font-extrabold">{aluno.nome}</span>
+                              </div>
+                              <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded border shrink-0 ${
+                                isCelula 
+                                  ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' 
+                                  : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+                              }`}>
+                                CONFIRMADO
                               </span>
-                              <span>{aluno.nome}</span>
-                            </span>
+                            </div>
                           ))}
                         </div>
                       </div>
@@ -312,23 +321,25 @@ export function ListaInscricoesWidget() {
                           <div className="text-[10px] font-black uppercase text-rose-300 tracking-wider">
                             ⚠️ LISTA DE ESPERA - ORDEM DE CHEGADA ({emEspera} ALUNO{emEspera > 1 ? 'S' : ''}):
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 max-h-36 overflow-y-auto pr-1">
+                          <div className="flex flex-col gap-1.5">
                             {emEsperaLista.map((aluno, i) => {
                               const posFila = i + 1;
                               const posGeral = vagasTotais + i + 1;
                               return (
-                                <span 
+                                <div 
                                   key={i}
-                                  className="px-2.5 py-1 rounded-lg border font-black text-[11px] uppercase flex items-center gap-1.5 bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
+                                  className="p-2 px-3 rounded-xl border font-bold text-xs uppercase flex items-center justify-between gap-2 bg-rose-950/80 border-rose-500/80 text-rose-200 shadow-[0_0_10px_rgba(244,63,94,0.3)]"
                                 >
-                                  <span className="w-4 h-4 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[9px] font-mono text-rose-200 shrink-0 font-bold">
-                                    {posGeral}
-                                  </span>
-                                  <span>{aluno.nome}</span>
-                                  <span className="text-[9px] font-black uppercase text-rose-200 bg-rose-500/40 px-1.5 py-0.5 rounded border border-rose-400/80 ml-1">
+                                  <div className="flex items-center gap-2.5 truncate">
+                                    <span className="w-4 h-4 rounded-full border border-rose-400 bg-rose-500/30 flex items-center justify-center text-[9px] font-mono text-rose-200 shrink-0 font-bold">
+                                      {posGeral}
+                                    </span>
+                                    <span className="truncate tracking-tight font-extrabold">{aluno.nome}</span>
+                                  </div>
+                                  <span className="text-[9px] font-black uppercase text-rose-200 bg-rose-500/40 px-2 py-0.5 rounded border border-rose-400/80 shrink-0">
                                     ⏳ {posFila}º NA FILA
                                   </span>
-                                </span>
+                                </div>
                               );
                             })}
                           </div>
