@@ -133,11 +133,15 @@ export function ListaInscricaoSection() {
             const nomesVistos = new Set<string>();
             const inscritosUnicos: { nome: string; turma: string; criadoEm: string }[] = [];
             inscritosComTimestamp.forEach(i => {
-              const key = i.alunoNome.trim().toUpperCase();
+              const displayNome = i.convidadoDe 
+                ? `${i.alunoNome.toUpperCase()} - CONVIDADO DE: ${i.convidadoDe.toUpperCase()}`
+                : i.alunoNome.toUpperCase();
+
+              const key = displayNome.trim();
               if (!nomesVistos.has(key)) {
                 nomesVistos.add(key);
                 inscritosUnicos.push({
-                  nome: i.alunoNome.toUpperCase(),
+                  nome: displayNome,
                   turma: i.turma || '',
                   criadoEm: i.criadoEm || ''
                 });

@@ -518,7 +518,13 @@ export async function batchSaveFirestorePermissoesEsporte(permissoes: PermissaoA
 export async function saveFirestoreInscricaoEsporte(inscricao: InscricaoEsporte): Promise<void> {
   const path = 'inscricoes_esporte';
   try {
-    const docId = (inscricao.alunoNome.trim().toUpperCase() + '_' + (inscricao.data || new Date().toISOString().split('T')[0])).replace(/[^A-Z0-9]/g, '_');
+    const isConvidado = !!inscricao.convidadoDe;
+    const docId = inscricao.id || (
+      inscricao.alunoNome.trim().toUpperCase() + 
+      (isConvidado ? '_CONV_' + inscricao.convidadoDe!.trim().toUpperCase() + '_' : '_') + 
+      (inscricao.data || new Date().toISOString().split('T')[0])
+    ).replace(/[^A-Z0-9]/g, '_');
+
     const docRef = doc(db, path, docId);
     
     // Preserve original creation timestamp if document exists
@@ -537,6 +543,7 @@ export async function saveFirestoreInscricaoEsporte(inscricao: InscricaoEsporte)
 
     await setDoc(docRef, {
       alunoNome: inscricao.alunoNome.trim().toUpperCase(),
+      convidadoDe: inscricao.convidadoDe ? inscricao.convidadoDe.trim().toUpperCase() : '',
       turma: inscricao.turma || '',
       data: inscricao.data || new Date().toISOString().split('T')[0],
       celulaConfirmada: inscricao.celulaConfirmada !== false,
@@ -549,6 +556,15 @@ export async function saveFirestoreInscricaoEsporte(inscricao: InscricaoEsporte)
   }
 }
 
+export async function deleteFirestoreInscricaoEsporte(idDoc: string): Promise<void> {
+  const path = 'inscricoes_esporte';
+  try {
+    await deleteDoc(doc(db, path, idDoc));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+  }
+}
+
 export function subscribeFirestoreInscricoesEsporte(onUpdate: (list: InscricaoEsporte[]) => void) {
   const path = 'inscricoes_esporte';
   return onSnapshot(collection(db, path), (snap) => {
@@ -558,6 +574,7 @@ export function subscribeFirestoreInscricoesEsporte(onUpdate: (list: InscricaoEs
       list.push({
         id: d.id,
         alunoNome: data.alunoNome || '',
+        convidadoDe: data.convidadoDe || '',
         turma: data.turma || '',
         data: data.data || '',
         celulaConfirmada: !!data.celulaConfirmada,

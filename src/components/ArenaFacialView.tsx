@@ -53,10 +53,23 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
     return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
   };
 
-  const hojeISO = getISOString(new Date()) || new Date().toISOString().split('T')[0];
+  // Helper para obter a data de Sábado da semana corrente (ou hoje se já for sábado)
+  const getSabadoDataISO = (): string => {
+    const d = new Date();
+    const day = d.getDay();
+    if (day === 6) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    const diff = 6 - day;
+    const sabado = new Date(d);
+    sabado.setDate(d.getDate() + diff);
+    return sabado.getFullYear() + '-' + String(sabado.getMonth() + 1).padStart(2, '0') + '-' + String(sabado.getDate()).padStart(2, '0');
+  };
 
-  // Selected class date (default to today)
-  const [dataAula, setDataAula] = useState<string>(hojeISO);
+  const sabadoPadraoISO = getSabadoDataISO();
+
+  // Selected class date (default to Saturday)
+  const [dataAula, setDataAula] = useState<string>(sabadoPadraoISO);
 
   // Check if student is active/enrolled on dataISO
   const ativo = (aluno: Aluno, dataISO: string) => {
@@ -469,7 +482,19 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
       {/* CAMERA MODAL CONFIRMAÇÃO DE PRESENÇA */}
       {modalAluno && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex flex-col items-center justify-center p-4 animate-fade-in overflow-y-auto select-none">
-          <div className="bg-[#080d19] border-2 border-emerald-400 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-[0_0_50px_rgba(16,185,129,0.3)] relative text-center space-y-4">
+          {/* Keyframe animation for continuous laser scan beam matching attached video */}
+          <style>{`
+            @keyframes scanLineAnimation {
+              0% { top: 5%; opacity: 0.8; }
+              50% { top: 88%; opacity: 1; }
+              100% { top: 5%; opacity: 0.8; }
+            }
+            .animate-laser-scan-beam {
+              animation: scanLineAnimation 2.2s ease-in-out infinite;
+            }
+          `}</style>
+
+          <div className="bg-[#060a14] border-2 border-emerald-400 rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-[0_0_50px_rgba(16,185,129,0.35)] relative text-center space-y-4">
             
             {/* Flash Effect Layer */}
             {flashEffect && (
@@ -495,8 +520,8 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
               </button>
             </div>
 
-            {/* Camera Viewfinder Stream */}
-            <div className="relative w-full h-64 bg-black rounded-2xl border-2 border-emerald-500/80 overflow-hidden shadow-[0_0_25px_rgba(16,185,129,0.25)] flex items-center justify-center">
+            {/* Camera Viewfinder Stream matching the video frame & laser scanner effect */}
+            <div className="relative w-full h-72 bg-black rounded-2xl border-2 border-emerald-400 overflow-hidden shadow-[0_0_30px_rgba(16,185,129,0.3)] flex items-center justify-center">
               <video 
                 ref={videoRef} 
                 autoPlay 
@@ -520,11 +545,19 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                 </div>
               )}
 
-              {/* Corner Reticle Brackets */}
-              <div className="absolute top-3 left-3 w-6 h-6 border-t-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-              <div className="absolute top-3 right-3 w-6 h-6 border-t-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-              <div className="absolute bottom-3 left-3 w-6 h-6 border-b-2 border-l-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
-              <div className="absolute bottom-3 right-3 w-6 h-6 border-b-2 border-r-2 border-emerald-400 z-10 shadow-[0_0_8px_#10b981]" />
+              {/* Bright White/Cyan Corner Brackets matching attached video screenshot */}
+              <div className="absolute top-3 left-3 w-8 h-8 border-t-4 border-l-4 border-white/90 z-30 shadow-[0_0_10px_#ffffff]" />
+              <div className="absolute top-3 right-3 w-8 h-8 border-t-4 border-r-4 border-white/90 z-30 shadow-[0_0_10px_#ffffff]" />
+              <div className="absolute bottom-3 left-3 w-8 h-8 border-b-4 border-l-4 border-white/90 z-30 shadow-[0_0_10px_#ffffff]" />
+              <div className="absolute bottom-3 right-3 w-8 h-8 border-b-4 border-r-4 border-white/90 z-30 shadow-[0_0_10px_#ffffff]" />
+
+              {/* Continuous Scanning Green/Cyan Laser Beam Line matching attached video */}
+              {cameraActive && (
+                <>
+                  <div className="absolute left-2 right-2 h-1 bg-gradient-to-r from-emerald-400 via-teal-200 to-emerald-400 shadow-[0_0_15px_#10b981,0_0_25px_#10b981] rounded-full animate-laser-scan-beam z-30 pointer-events-none" />
+                  <div className="absolute left-2 right-2 h-12 bg-gradient-to-b from-emerald-500/30 to-transparent animate-laser-scan-beam z-20 pointer-events-none -mt-12" />
+                </>
+              )}
 
               {/* Center Target Crosshair */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40">
@@ -534,7 +567,7 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
               </div>
 
               {/* SVG Facial Mesh Landmark Overlay */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 z-10" viewBox="0 0 320 240">
+              <svg className="absolute inset-0 w-full h-full pointer-events-none opacity-80 z-20" viewBox="0 0 320 240">
                 <g stroke="#10b981" strokeWidth="0.9" opacity="0.75">
                   <line x1="120" y1="80" x2="160" y2="110"/>
                   <line x1="200" y1="80" x2="160" y2="110"/>
@@ -553,10 +586,17 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                 </g>
               </svg>
 
+              {/* Top Banner inside camera view */}
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-black/70 border border-emerald-400/60 px-3 py-1 rounded-lg z-30 shadow-[0_0_10px_rgba(16,185,129,0.3)]">
+                <span className="text-[10px] font-black uppercase text-emerald-300 tracking-widest font-mono">
+                  RECONHECIMENTO FACIAL ARENA
+                </span>
+              </div>
+
               {/* Capturing Pulse */}
               {capturando && (
-                <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-xs flex items-center justify-center z-20 animate-pulse">
-                  <span className="text-white font-black uppercase text-xs tracking-widest bg-black/80 px-4 py-2 rounded-xl border border-emerald-400 flex items-center gap-2">
+                <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-xs flex items-center justify-center z-40 animate-pulse">
+                  <span className="text-white font-black uppercase text-xs tracking-widest bg-black/90 px-4 py-2 rounded-xl border border-emerald-400 flex items-center gap-2 shadow-2xl">
                     <Sparkles className="w-4 h-4 text-emerald-400 animate-spin" />
                     <span>REGISTRANDO PRESENÇA...</span>
                   </span>
@@ -565,17 +605,17 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
             </div>
 
             {/* Student Info Box below camera */}
-            <div className="bg-[#040812] border border-emerald-500/40 rounded-2xl p-4 text-left space-y-2">
+            <div className="bg-[#030712] border border-emerald-500/50 rounded-2xl p-4 text-left space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] text-emerald-400 font-extrabold uppercase tracking-widest">
+                <span className="text-[10px] text-emerald-400 font-black uppercase tracking-widest">
                   ALUNO SELECIONADO:
                 </span>
-                <span className="text-[10px] text-gray-400 font-mono">
-                  {dataBR}
+                <span className="text-[10px] text-emerald-300 font-mono font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/30">
+                  SÁBADO ({dataBR})
                 </span>
               </div>
 
-              <h3 className="text-xl font-black text-white uppercase tracking-wider font-chakra flex items-center gap-2">
+              <h3 className="text-xl md:text-2xl font-black text-white uppercase tracking-wider font-chakra flex items-center gap-2">
                 <UserCheck className="w-5 h-5 text-emerald-400 shrink-0" />
                 <span>{modalAluno.nome}</span>
               </h3>
@@ -588,15 +628,15 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
 
             {/* Success Banner or CONFIRMAR Button */}
             {confirmSucesso ? (
-              <div className="bg-emerald-950/80 border-2 border-emerald-400 rounded-2xl p-4 text-center space-y-2 animate-scale-up">
-                <div className="flex items-center justify-center gap-2 text-emerald-400 font-black text-base uppercase">
+              <div className="bg-emerald-950/90 border-2 border-emerald-400 rounded-2xl p-4 text-center space-y-2 shadow-[0_0_20px_rgba(16,185,129,0.3)]">
+                <div className="flex items-center justify-center gap-2 text-emerald-400 font-black text-base uppercase font-chakra">
                   <CheckCircle className="w-6 h-6 stroke-[3]" />
                   <span>PRESENÇA CONFIRMADA!</span>
                 </div>
                 <p className="text-xs text-emerald-200 font-mono font-bold">
-                  Horário: {confirmSucesso.hora} • {dataBR}
+                  Horário: {confirmSucesso.hora} • Sábado ({dataBR})
                 </p>
-                <p className="text-[10px] text-emerald-400/80 uppercase tracking-widest">
+                <p className="text-[10px] text-emerald-400/90 uppercase font-black tracking-widest">
                   Foto processada e descartada da memória ✓
                 </p>
               </div>
@@ -605,10 +645,10 @@ export function ArenaFacialView({ onBack }: ArenaFacialViewProps) {
                 type="button"
                 disabled={capturando}
                 onClick={handleConfirmarPresencaComFoto}
-                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-sm sm:text-base tracking-widest rounded-2xl transition cursor-pointer shadow-[0_0_25px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 active:scale-95"
+                className="w-full py-4 bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase text-sm sm:text-base tracking-widest rounded-2xl transition cursor-pointer shadow-[0_0_25px_rgba(16,185,129,0.5)] flex items-center justify-center gap-2 active:scale-95 font-chakra"
               >
                 <Camera className="w-5 h-5" />
-                <span>CONFIRMAR PRESENÇA</span>
+                <span>CONFIRMAR PRESENÇA DE SÁBADO</span>
               </button>
             )}
 

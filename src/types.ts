@@ -55,6 +55,7 @@ export interface PermissaoAlunoEsporte {
 export interface InscricaoEsporte {
   id: string;
   alunoNome: string;
+  convidadoDe?: string;
   turma: string;
   data: string;
   celulaConfirmada: boolean;

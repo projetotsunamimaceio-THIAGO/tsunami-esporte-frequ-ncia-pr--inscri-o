@@ -19,9 +19,11 @@ import {
   Search,
   ShieldAlert,
   CheckSquare,
-  Square
+  Square,
+  UserPlus,
+  Users
 } from 'lucide-react';
-import { ProgramacaoItem, Aluno, PermissaoAlunoEsporte } from '../types';
+import { ProgramacaoItem, Aluno, PermissaoAlunoEsporte, InscricaoEsporte } from '../types';
 import { 
   subscribeFirestoreProgramacao, 
   saveFirestoreProgramacao, 
@@ -32,7 +34,10 @@ import {
   batchSaveFirestorePermissoesEsporte,
   clearAllFirestoreInscricoesEsporte,
   saveFirestoreConfiguracaoEsporte,
-  subscribeFirestoreConfiguracaoEsporte
+  subscribeFirestoreConfiguracaoEsporte,
+  subscribeFirestoreInscricoesEsporte,
+  saveFirestoreInscricaoEsporte,
+  deleteFirestoreInscricaoEsporte
 } from '../lib/firestoreService';
 
 interface ProgramacaoEsportivaViewProps {
@@ -73,6 +78,14 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   // Modal para editar atividade existente
   const [editingItem, setEditingItem] = useState<ProgramacaoItem | null>(null);
 
+  // Inscrições e Modal de Convidados
+  const [inscricoesList, setInscricoesList] = useState<InscricaoEsporte[]>([]);
+  const [showConvidadoModal, setShowConvidadoModal] = useState<boolean>(false);
+  const [convidadoTab, setConvidadoTab] = useState<'novo' | 'lista'>('novo');
+  const [alunoAnfitriaoNome, setAlunoAnfitriaoNome] = useState<string>('');
+  const [nomeConvidado, setNomeConvidado] = useState<string>('');
+  const [aulasConvidado, setAulasConvidado] = useState<string[]>([]);
+
   // Subscrever ao Firestore em tempo real
   useEffect(() => {
     const unsubProg = subscribeFirestoreProgramacao(async (firebaseList) => {
@@ -109,11 +122,16 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
       setJustificativasTrancadas(config.justificativasTrancadas);
     });
 
+    const unsubInsc = subscribeFirestoreInscricoesEsporte((list) => {
+      setInscricoesList(list);
+    });
+
     return () => {
       unsubProg();
       unsubAlunos();
       unsubPerms();
       unsubConfig();
+      unsubInsc();
     };
   }, []);
 
@@ -203,6 +221,60 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     await saveFirestoreProgramacao(editingItem);
     setEditingItem(null);
     triggerSuccessAnimation(editingItem.id);
+  };
+
+  // Abrir Modal de Convidados para um aluno específico
+  const handleAbrirConvidadoParaAluno = (alunoNome: string) => {
+    setAlunoAnfitriaoNome(alunoNome);
+    setNomeConvidado('');
+    setAulasConvidado(atividadesDinamicas.map(a => a.titulo));
+    setConvidadoTab('novo');
+    setShowConvidadoModal(true);
+  };
+
+  // Alternar seleção de aula para o Convidado
+  const handleToggleAulaConvidado = (tituloAula: string) => {
+    if (aulasConvidado.includes(tituloAula)) {
+      setAulasConvidado(aulasConvidado.filter(a => a !== tituloAula));
+    } else {
+      setAulasConvidado([...aulasConvidado, tituloAula]);
+    }
+  };
+
+  // Salvar Inscrição de Convidado
+  const handleSalvarConvidado = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!alunoAnfitriaoNome || !nomeConvidado.trim()) {
+      alert('Por favor, selecione o aluno anfitrião e digite o nome do convidado.');
+      return;
+    }
+
+    const alunoObj = alunos.find(a => a.nome.trim().toUpperCase() === alunoAnfitriaoNome.trim().toUpperCase());
+
+    const novaInscConvidado: InscricaoEsporte = {
+      id: 'conv_' + Date.now(),
+      alunoNome: nomeConvidado.trim().toUpperCase(),
+      convidadoDe: alunoAnfitriaoNome.trim().toUpperCase(),
+      turma: alunoObj?.turma || 'CONVIDADO',
+      data: new Date().toISOString().split('T')[0],
+      celulaConfirmada: true,
+      celulaHora: '19:45',
+      turmasSelecionadas: aulasConvidado.length > 0 ? aulasConvidado : atividadesDinamicas.map(a => a.titulo),
+      criadoEm: new Date().toISOString()
+    };
+
+    await saveFirestoreInscricaoEsporte(novaInscConvidado);
+    alert(`✅ Convidado "${nomeConvidado.toUpperCase()}" cadastrado com sucesso! (Anfitrião: ${alunoAnfitriaoNome.toUpperCase()})`);
+    
+    setNomeConvidado('');
+    setConvidadoTab('lista');
+  };
+
+  // Remover Convidado
+  const handleExcluirConvidado = async (idInsc: string, nomeConv: string) => {
+    if (window.confirm(`Deseja remover a inscrição do convidado "${nomeConv}"?`)) {
+      await deleteFirestoreInscricaoEsporte(idInsc);
+    }
   };
 
   // Excluir atividade dinâmica
@@ -687,8 +759,19 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                     <span>CONTROLE DE ALUNOS & ACESSOS</span>
                   </h2>
 
-                  {/* Top Action Buttons (Trancar Justificativas / Trancar Inscrições / Resetar) */}
+                  {/* Top Action Buttons (Trancar Justificativas / Trancar Inscrições / Convidados / Resetar) */}
                   <div className="flex flex-wrap items-center gap-3">
+                    <button
+                      onClick={() => {
+                        setShowConvidadoModal(true);
+                        setConvidadoTab('novo');
+                      }}
+                      className="px-4 py-2 bg-cyan-500/20 border border-cyan-400 text-cyan-300 hover:bg-cyan-400 hover:text-black rounded-xl text-xs font-black uppercase transition flex items-center gap-2 cursor-pointer shadow-[0_0_12px_rgba(6,182,212,0.3)]"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>CONVIDADOS ({inscricoesList.filter(i => !!i.convidadoDe).length})</span>
+                    </button>
+
                     <button
                       onClick={handleToggleTrancarJustificativas}
                       className={`px-4 py-2 rounded-xl text-xs font-black uppercase transition flex items-center gap-2 border cursor-pointer ${
@@ -831,42 +914,83 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                         <div className="md:col-span-7 space-y-4">
                           
                           {/* Student Header & Main Toggle */}
-                          <div className="flex items-center justify-between gap-3 pb-3 border-b border-white/5">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/5">
                             <div>
                               <h3 className="text-base md:text-lg font-black text-white uppercase tracking-wider font-chakra">
                                 {aluno.nome}
                               </h3>
                               {aluno.turma && (
-                                <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest">
+                                <span className="text-[10px] text-cyan-400 font-bold uppercase tracking-widest block">
                                   TURMA: {aluno.turma}
                                 </span>
                               )}
+
+                              {/* Convidados cadastrados por este aluno */}
+                              {(() => {
+                                const convs = inscricoesList.filter(i => i.convidadoDe && i.convidadoDe.trim().toUpperCase() === aluno.nome.trim().toUpperCase());
+                                if (convs.length === 0) return null;
+                                return (
+                                  <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                                    <span className="text-[10px] font-black uppercase text-cyan-400">
+                                      👥 CONVIDADOS ({convs.length}):
+                                    </span>
+                                    {convs.map(c => (
+                                      <span 
+                                        key={c.id}
+                                        className="bg-cyan-950/80 border border-cyan-400/60 text-cyan-200 px-2 py-0.5 rounded-md text-[9px] font-bold uppercase flex items-center gap-1"
+                                      >
+                                        <span>{c.alunoNome}</span>
+                                        <button 
+                                          onClick={() => handleExcluirConvidado(c.id, c.alunoNome)}
+                                          className="text-rose-400 hover:text-white ml-0.5"
+                                          title="Remover Convidado"
+                                        >
+                                          ✕
+                                        </button>
+                                      </span>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </div>
 
-                            {/* Liberar / Bloquear Toggle Switch Pill */}
-                            <div className="flex bg-black/80 border border-emerald-500/40 p-1 rounded-xl">
+                            <div className="flex items-center gap-2 shrink-0">
+                              {/* Botão + CONVIDADO */}
                               <button
                                 type="button"
-                                onClick={() => handleToggleLiberarAluno(aluno, true)}
-                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer ${
-                                  perm.liberado
-                                    ? 'bg-emerald-500 text-black shadow-[0_0_8px_rgba(16,185,129,0.5)]'
-                                    : 'text-gray-400 hover:text-white'
-                                }`}
+                                onClick={() => handleAbrirConvidadoParaAluno(aluno.nome)}
+                                className="px-3 py-1.5 bg-cyan-500/20 border border-cyan-400 text-cyan-300 hover:bg-cyan-400 hover:text-black rounded-xl text-[10px] font-black uppercase transition flex items-center gap-1.5 cursor-pointer shadow-[0_0_8px_rgba(6,182,212,0.25)]"
+                                title="Cadastrar Convidado para este Aluno"
                               >
-                                LIBERAR
+                                <UserPlus className="w-3.5 h-3.5" />
+                                <span>+ CONVIDADO</span>
                               </button>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleLiberarAluno(aluno, false)}
-                                className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer ${
-                                  !perm.liberado
-                                    ? 'bg-rose-500 text-black shadow-[0_0_8px_rgba(244,63,94,0.5)]'
-                                    : 'text-gray-400 hover:text-white'
-                                }`}
-                              >
-                                BLOQUEAR
-                              </button>
+
+                              {/* Liberar / Bloquear Toggle Switch Pill */}
+                              <div className="flex bg-black/80 border border-emerald-500/40 p-1 rounded-xl">
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLiberarAluno(aluno, true)}
+                                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer ${
+                                    perm.liberado
+                                      ? 'bg-emerald-500 text-black shadow-[0_0_8px_rgba(16,185,129,0.5)]'
+                                      : 'text-gray-400 hover:text-white'
+                                  }`}
+                                >
+                                  LIBERAR
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleLiberarAluno(aluno, false)}
+                                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase transition cursor-pointer ${
+                                    !perm.liberado
+                                      ? 'bg-rose-500 text-black shadow-[0_0_8px_rgba(244,63,94,0.5)]'
+                                      : 'text-gray-400 hover:text-white'
+                                  }`}
+                                >
+                                  BLOQUEAR
+                                </button>
+                              </div>
                             </div>
                           </div>
 
@@ -1134,6 +1258,199 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ======================================================== */}
+      {/* MODAL 3: GERENCIAR CONVIDADOS */}
+      {/* ======================================================== */}
+      {showConvidadoModal && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-[#090d1c] border-2 border-cyan-400 p-6 md:p-8 rounded-3xl max-w-lg w-full shadow-[0_0_40px_rgba(6,182,212,0.3)] space-y-5">
+            
+            {/* Modal Header */}
+            <div className="flex items-center justify-between pb-3 border-b border-cyan-500/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-400 flex items-center justify-center text-cyan-300">
+                  <UserPlus className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-white uppercase tracking-wider font-chakra">
+                    GERENCIAR CONVIDADOS
+                  </h3>
+                  <p className="text-xs text-cyan-400 font-bold uppercase tracking-widest">
+                    ÁREA ESPORTIVA & CÉLULA
+                  </p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => setShowConvidadoModal(false)}
+                className="text-gray-400 hover:text-white p-1 text-xs font-bold uppercase"
+              >
+                ✕ FECHAR
+              </button>
+            </div>
+
+            {/* Modal Tabs */}
+            <div className="flex bg-black/60 p-1 rounded-xl border border-cyan-500/30">
+              <button
+                type="button"
+                onClick={() => setConvidadoTab('novo')}
+                className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition ${
+                  convidadoTab === 'novo'
+                    ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                + NOVO CONVIDADO
+              </button>
+              <button
+                type="button"
+                onClick={() => setConvidadoTab('lista')}
+                className={`flex-1 py-2 text-xs font-black uppercase rounded-lg transition ${
+                  convidadoTab === 'lista'
+                    ? 'bg-cyan-500 text-black shadow-[0_0_10px_rgba(6,182,212,0.4)]'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                INSCRITOS ({inscricoesList.filter(i => !!i.convidadoDe).length})
+              </button>
+            </div>
+
+            {convidadoTab === 'novo' ? (
+              <form onSubmit={handleSalvarConvidado} className="space-y-4">
+                {/* 1. Selecionar Aluno Anfitrião */}
+                <div>
+                  <label className="block text-xs uppercase text-cyan-300 font-bold mb-1">
+                    1. Aluno Anfitrião (Quem está convidando)
+                  </label>
+                  <select
+                    value={alunoAnfitriaoNome}
+                    onChange={e => setAlunoAnfitriaoNome(e.target.value)}
+                    className="w-full p-3 rounded-xl bg-gray-900 border border-cyan-500/40 text-white outline-none focus:border-cyan-400 font-bold text-sm uppercase cursor-pointer"
+                    required
+                  >
+                    <option value="">-- SELECIONE O ALUNO ANFITRIÃO --</option>
+                    {alunosMatriculadosNoPeriodo.map(a => (
+                      <option key={a.nome} value={a.nome}>
+                        {a.nome} {a.turma ? `(${a.turma})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 2. Nome do Convidado */}
+                <div>
+                  <label className="block text-xs uppercase text-cyan-300 font-bold mb-1">
+                    2. Nome Completo do Convidado
+                  </label>
+                  <input
+                    type="text"
+                    value={nomeConvidado}
+                    onChange={e => setNomeConvidado(e.target.value)}
+                    placeholder="EX: LUCAS HENRIQUE SILVA"
+                    className="w-full p-3.5 rounded-xl bg-gray-900 border border-cyan-500/40 text-white outline-none focus:border-cyan-400 font-bold text-sm uppercase tracking-wider"
+                    required
+                  />
+                </div>
+
+                {/* 3. Modalidades Esportivas */}
+                <div>
+                  <label className="block text-xs uppercase text-cyan-300 font-bold mb-2">
+                    3. Modalidades Permitidas ao Convidado
+                  </label>
+                  {atividadesDinamicas.length === 0 ? (
+                    <p className="text-xs text-gray-500 italic">Nenhuma atividade esportiva cadastrada.</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2">
+                      {atividadesDinamicas.map(act => {
+                        const isChecked = aulasConvidado.includes(act.titulo);
+                        return (
+                          <button
+                            key={act.id}
+                            type="button"
+                            onClick={() => handleToggleAulaConvidado(act.titulo)}
+                            className={`px-3 py-1.5 rounded-xl border text-xs font-bold uppercase transition flex items-center gap-1.5 cursor-pointer ${
+                              isChecked
+                                ? 'bg-cyan-500/20 border-cyan-400 text-cyan-300 shadow-[0_0_8px_rgba(6,182,212,0.3)]'
+                                : 'bg-gray-900 border-gray-800 text-gray-500 hover:text-white'
+                            }`}
+                          >
+                            {isChecked ? <CheckSquare className="w-3.5 h-3.5 text-cyan-400" /> : <Square className="w-3.5 h-3.5 text-gray-600" />}
+                            <span>{act.titulo}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-3 pt-3 border-t border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => setShowConvidadoModal(false)}
+                    className="flex-1 border border-gray-700 text-gray-400 p-3 rounded-xl uppercase text-xs font-bold hover:bg-gray-800 transition cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 bg-cyan-400 text-black p-3 rounded-xl uppercase text-xs font-black hover:bg-cyan-300 transition cursor-pointer shadow-[0_0_15px_rgba(6,182,212,0.4)]"
+                  >
+                    INSCREVER CONVIDADO
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* TAB LISTA DE CONVIDADOS */
+              <div className="space-y-3">
+                {(() => {
+                  const convs = inscricoesList.filter(i => !!i.convidadoDe);
+                  if (convs.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-gray-500 text-xs font-bold uppercase tracking-widest bg-black/40 rounded-2xl border border-gray-800">
+                        Nenhum convidado inscrito até o momento.
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="max-h-72 overflow-y-auto space-y-2 pr-1">
+                      {convs.map((c, idx) => (
+                        <div
+                          key={c.id || idx}
+                          className="p-3 bg-black/60 border border-cyan-500/30 rounded-2xl flex items-center justify-between gap-3"
+                        >
+                          <div>
+                            <div className="font-extrabold text-xs text-white uppercase tracking-wider">
+                              {c.alunoNome}
+                            </div>
+                            <div className="text-[10px] font-bold text-cyan-400 uppercase">
+                              CONVIDADO DE: <span className="text-white">{c.convidadoDe}</span>
+                            </div>
+                            <div className="text-[9px] text-gray-400 font-mono mt-1">
+                              Modalidades: {c.turmasSelecionadas.join(', ') || 'Célula Evangelística'}
+                            </div>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => handleExcluirConvidado(c.id, c.alunoNome)}
+                            className="p-2 bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-black rounded-xl text-xs font-bold transition cursor-pointer shrink-0"
+                            title="Remover Convidado"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
           </div>
         </div>
       )}

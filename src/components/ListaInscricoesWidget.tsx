@@ -79,11 +79,15 @@ export function ListaInscricoesWidget() {
         : (ins.turmasSelecionadas && ins.turmasSelecionadas.includes(tituloAtividade));
 
       if (bateuAtividade) {
-        const key = ins.alunoNome.trim().toUpperCase();
+        const displayNome = ins.convidadoDe 
+          ? `${ins.alunoNome.toUpperCase()} - CONVIDADO DE: ${ins.convidadoDe.toUpperCase()}`
+          : ins.alunoNome.toUpperCase();
+
+        const key = displayNome.trim();
         if (!nomesVistos.has(key)) {
           nomesVistos.add(key);
           inscritosUnicos.push({
-            nome: ins.alunoNome,
+            nome: displayNome,
             turma: ins.turma || '',
             criadoEm: ins.criadoEm || ''
           });
