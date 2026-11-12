@@ -598,14 +598,20 @@ export function subscribeFirestoreInscricoesEsporte(onUpdate: (list: InscricaoEs
 }
 
 export async function clearAllFirestoreInscricoesEsporte(): Promise<void> {
-  const path = 'inscricoes_esporte';
+  const pathInsc = 'inscricoes_esporte';
+  const pathFreq = 'frequencia';
   try {
-    const snap = await getDocs(collection(db, path));
-    for (const d of snap.docs) {
-      await deleteDoc(doc(db, path, d.id));
-    }
+    // 1. Limpar todas as inscrições de esporte e Célula
+    const snapInsc = await getDocs(collection(db, pathInsc));
+    const deleteInscPromises = snapInsc.docs.map(d => deleteDoc(doc(db, pathInsc, d.id)));
+    await Promise.all(deleteInscPromises);
+
+    // 2. Limpar todos os registros de frequência e presença na Célula/sábado
+    const snapFreq = await getDocs(collection(db, pathFreq));
+    const deleteFreqPromises = snapFreq.docs.map(d => deleteDoc(doc(db, pathFreq, d.id)));
+    await Promise.all(deleteFreqPromises);
   } catch (error) {
-    handleFirestoreError(error, OperationType.DELETE, path);
+    handleFirestoreError(error, OperationType.DELETE, pathInsc);
   }
 }
 

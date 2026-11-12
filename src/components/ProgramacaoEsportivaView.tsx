@@ -61,6 +61,11 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
   const [inscricoesTrancadas, setInscricoesTrancadas] = useState<boolean>(false);
   const [justificativasTrancadas, setJustificativasTrancadas] = useState<boolean>(false);
 
+  // Modal Reset de Inscrições com Checkbox
+  const [showResetModal, setShowResetModal] = useState<boolean>(false);
+  const [resetConfirmChecked, setResetConfirmChecked] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
+
   const [loading, setLoading] = useState<boolean>(true);
   const [saveSuccessId, setSaveSuccessId] = useState<string | null>(null);
 
@@ -418,10 +423,23 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
     await saveFirestoreConfiguracaoEsporte(inscricoesTrancadas, novoStatus);
   };
 
-  const handleResetarInscricoes = async () => {
-    if (window.confirm('Deseja realmente RESETAR E APAGAR TODAS AS INSCRIÇÕES já realizadas pelos alunos?\n\nIsso limpará instantaneamente a Lista de Inscrição no banco de dados e na tela inicial.')) {
+  const handleAbrirResetModal = () => {
+    setShowResetModal(true);
+    setResetConfirmChecked(false);
+  };
+
+  const handleExecutarResetInscricoes = async () => {
+    if (!resetConfirmChecked) return;
+    setIsResetting(true);
+    try {
       await clearAllFirestoreInscricoesEsporte();
-      alert('✅ Todas as pré-inscrições foram apagadas e a Lista de Inscrição foi zerada com sucesso!');
+      setShowResetModal(false);
+      setResetConfirmChecked(false);
+      alert('✅ Todas as inscrições da Célula e das modalidades esportivas foram apagadas e zeradas com sucesso!');
+    } catch (e) {
+      alert('Erro ao resetar inscrições.');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -797,7 +815,7 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                     </button>
 
                     <button
-                      onClick={handleResetarInscricoes}
+                      onClick={handleAbrirResetModal}
                       className="px-4 py-2 bg-rose-950/60 border border-rose-500/50 text-rose-400 hover:bg-rose-500 hover:text-black rounded-xl text-xs font-black uppercase transition flex items-center gap-2 cursor-pointer"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -1450,6 +1468,81 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                 })()}
               </div>
             )}
+
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE RESET DE INSCRIÇÕES COM CHECKBOX */}
+      {showResetModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in select-none">
+          <div className="bg-[#0b0e1b] border-2 border-rose-500/80 rounded-3xl p-6 md:p-8 max-w-lg w-full space-y-6 shadow-[0_0_50px_rgba(244,63,94,0.4)]">
+            
+            <div className="flex items-center gap-4 border-b border-rose-500/30 pb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/20 border border-rose-500 flex items-center justify-center text-rose-400 shrink-0">
+                <RotateCcw className="w-6 h-6 animate-spin" />
+              </div>
+              <div>
+                <h3 className="text-xl font-black font-chakra text-rose-400 uppercase tracking-wider">
+                  RESETAR INSCRIÇÕES
+                </h3>
+                <p className="text-[10px] text-rose-200/80 font-bold uppercase tracking-widest mt-0.5">
+                  Ação Irreversível no Banco de Dados
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs text-gray-300">
+              <p className="font-extrabold text-white text-sm">
+                ⚠️ O que será apagado ao resetar:
+              </p>
+              <ul className="list-disc list-inside space-y-1.5 text-gray-300 font-semibold bg-rose-950/40 p-3.5 rounded-2xl border border-rose-500/30">
+                <li>Lista completa de inscritos na <b>Célula Evangelística</b>.</li>
+                <li>Inscrições e filas de espera em todas as <b>Aulas Esportivas</b>.</li>
+                <li>Histórico de confirmações e lista de convidados registrados.</li>
+              </ul>
+            </div>
+
+            {/* CHECKBOX DE CONFIRMAÇÃO */}
+            <label className="flex items-start gap-3 p-4 rounded-2xl bg-black/60 border-2 border-rose-500/50 cursor-pointer hover:border-rose-400 transition select-none">
+              <input 
+                type="checkbox"
+                checked={resetConfirmChecked}
+                onChange={(e) => setResetConfirmChecked(e.target.checked)}
+                className="w-5 h-5 accent-rose-500 rounded cursor-pointer mt-0.5 shrink-0"
+              />
+              <span className="text-xs font-bold uppercase text-rose-200 leading-tight">
+                Estou ciente de que todas as inscrições da Célula e modalidades esportivas serão zeradas permanentemente.
+              </span>
+            </label>
+
+            {/* ACTION BUTTONS */}
+            <div className="grid grid-cols-2 gap-4 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResetModal(false);
+                  setResetConfirmChecked(false);
+                }}
+                disabled={isResetting}
+                className="p-3.5 rounded-2xl bg-black/40 border border-gray-700 text-gray-300 font-bold uppercase text-xs hover:bg-gray-800 transition cursor-pointer"
+              >
+                CANCELAR
+              </button>
+
+              <button
+                type="button"
+                onClick={handleExecutarResetInscricoes}
+                disabled={!resetConfirmChecked || isResetting}
+                className={`p-3.5 rounded-2xl font-black uppercase text-xs transition flex items-center justify-center gap-2 ${
+                  resetConfirmChecked && !isResetting
+                    ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-[0_0_25px_rgba(244,63,94,0.6)] cursor-pointer'
+                    : 'bg-gray-800 text-gray-500 border border-gray-700 cursor-not-allowed opacity-60'
+                }`}
+              >
+                {isResetting ? 'ZERANDO...' : 'CONFIRMAR E ZERAR TUDO ✓'}
+              </button>
+            </div>
 
           </div>
         </div>
