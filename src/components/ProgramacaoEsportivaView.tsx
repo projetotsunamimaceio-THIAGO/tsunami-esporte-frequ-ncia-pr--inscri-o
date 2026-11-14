@@ -1497,10 +1497,13 @@ export function ProgramacaoEsportivaView({ onBack }: ProgramacaoEsportivaViewPro
                 ⚠️ O que será apagado ao resetar:
               </p>
               <ul className="list-disc list-inside space-y-1.5 text-gray-300 font-semibold bg-rose-950/40 p-3.5 rounded-2xl border border-rose-500/30">
-                <li>Lista completa de inscritos na <b>Célula Evangelística</b>.</li>
-                <li>Inscrições e filas de espera em todas as <b>Aulas Esportivas</b>.</li>
-                <li>Histórico de confirmações e lista de convidados registrados.</li>
+                <li>Lista completa de pré-inscritos na <b>Célula Evangelística</b>.</li>
+                <li>Pré-inscrições e filas de espera em todas as <b>Aulas Esportivas</b>.</li>
+                <li>Lista de convidados registrados para esta programação.</li>
               </ul>
+              <p className="text-[11px] text-emerald-300 font-bold bg-emerald-950/40 border border-emerald-500/30 p-2.5 rounded-xl">
+                🛡️ A frequência da Arena / Arena Facial e o Relatório de Pontuação NÃO serão apagados.
+              </p>
             </div>
 
             {/* CHECKBOX DE CONFIRMAÇÃO */}
